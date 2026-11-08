@@ -1,8 +1,9 @@
-# Build + headless test on every push. On the default branch it also deploys
-# dist/ to the VPS (rsync via deploy/deploy.sh), sets up Nginx + HTTPS on the
-# first run (deploy/server-setup.sh) and checks the live site.
+# Build + headless test on every push. On the default branch it also:
+#   pages  - publishes dist/ to GitHub Pages (free, no domain/server) and tests the live page
+#   deploy - uploads dist/ to the VPS (rsync via deploy/deploy.sh), sets up Nginx + HTTPS on
+#            the first run (deploy/server-setup.sh) and checks the live site
 #
-# Deploy needs, under Settings → Secrets and variables → Actions:
+# VPS deploy needs, under Settings → Secrets and variables → Actions:
 #   secrets   VPS_HOST, VPS_USER, VPS_SSH_KEY (private key)   optional: VPS_PORT, VPS_KNOWN_HOSTS
 #   variable  DOMAIN (e.g. sovereign.example.com)              optional: CERTBOT_EMAIL
 # Until they are set, the deploy job is skipped with a warning.
@@ -51,6 +52,63 @@ jobs:
         if: always()
         with:
           name: smoke-test-local
+          path: smoke-test.png
+          if-no-files-found: ignore
+
+  # Free hosting, no domain or server: https://<owner>.github.io/<repo>/
+  # One-time: Settings → Pages → Build and deployment → Source: GitHub Actions
+  pages:
+    needs: test
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build
+        run: node build.mjs
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Wait until the site is live
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          for _ in $(seq 1 24); do
+            code="$(curl -s -o /dev/null -w '%{http_code}' "$PAGE_URL")"
+            [ "$code" = 200 ] && curl -s "$PAGE_URL" | grep -q SOVEREIGN && { echo "Live: $PAGE_URL"; exit 0; }
+            echo "HTTP $code, retrying..."; sleep 5
+          done
+          echo "::error::$PAGE_URL did not come online"; exit 1
+
+      - name: Install headless browser
+        run: |
+          npm install --no-save --no-package-lock "playwright@$PLAYWRIGHT_VERSION"
+          npx playwright install --with-deps chromium
+
+      - name: Smoke test (GitHub Pages)
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: node deploy/smoke-test.mjs "$PAGE_URL"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-test-pages
           path: smoke-test.png
           if-no-files-found: ignore
 

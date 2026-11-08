@@ -3,6 +3,7 @@
 Game nation builder 3D di browser. Kamu jadi presiden: mulai dengan lahan, modal, dan fasilitas dasar, lalu bangun negaramu. Setelah negaramu maju, buka diplomasi dan dirikan hingga 5 negara.
 
 ## Mainkan
+- **Online (gratis, tanpa domain/server):** https://fourtisf.github.io/soverign/ — di-deploy otomatis oleh GitHub Pages setiap ada push ke branch default. Aktifkan sekali di **Settings → Pages → Source: GitHub Actions**.
 - **Langsung:** buka `dist/index.html` di Chrome (butuh internet untuk Three.js & font).
 - **Lokal:** `npm run preview` → http://localhost:4173
 
@@ -16,9 +17,10 @@ Konfigurasi Nginx ada di `deploy/nginx.conf.example`, dan untuk Vercel cukup `ve
 ## Deploy otomatis lewat GitHub Actions
 `.github/workflows/deploy.yml` berjalan di setiap push:
 1. **Test** (semua branch): build, cek `dist/` sama dengan hasil build, lalu buka game di Chromium headless, klik "Mulai Memerintah", dan gagal jika ada error di console.
-2. **Deploy** (hanya branch default): upload `dist/` ke VPS dengan `deploy/deploy.sh`. Pada deploy pertama, `deploy/server-setup.sh` memasang site Nginx dan SSL (certbot). Setelah itu, workflow memeriksa situs live (HTTPS 200, `cache-control: no-cache`, redirect HTTP → HTTPS) dan menjalankan test browser yang sama.
+2. **Pages** (hanya branch default): publikasikan `dist/` ke GitHub Pages, lalu jalankan test browser yang sama ke situs live.
+3. **Deploy VPS** (hanya branch default, opsional): upload `dist/` ke VPS dengan `deploy/deploy.sh`. Pada deploy pertama, `deploy/server-setup.sh` memasang site Nginx dan SSL (certbot). Setelah itu, workflow memeriksa situs live (HTTPS 200, `cache-control: no-cache`, redirect HTTP → HTTPS) dan menjalankan test browser yang sama.
 
-Isi sekali di **Settings → Secrets and variables → Actions**:
+Untuk deploy VPS, isi sekali di **Settings → Secrets and variables → Actions**:
 
 | Nama | Jenis | Isi |
 |---|---|---|
