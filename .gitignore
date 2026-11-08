@@ -1,0 +1,25 @@
+# dependencies
+node_modules/
+
+# dist/ is intentionally committed: it is the playable single-file build
+# (README: open dist/index.html directly). Rebuild with `node build.mjs`.
+
+# env / secrets (none are needed, keep them out regardless)
+.env
+.env.*
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+
+# logs & tooling
+*.log
+npm-debug.log*
+.vercel/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

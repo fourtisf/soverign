@@ -1,0 +1,12 @@
+{
+  "name": "sovereign",
+  "version": "0.2.0",
+  "private": true,
+  "description": "SOVEREIGN — 3D nation builder (single-file Three.js prototype)",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "preview": "node build.mjs && npx --yes serve dist -l 4173"
+  },
+  "engines": { "node": ">=18" }
+}

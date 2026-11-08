@@ -1,0 +1,22 @@
+# /etc/nginx/sites-available/sovereign  —  static hosting for SOVEREIGN
+server {
+    listen 80;
+    server_name <DOMAIN>;                # e.g. sovereign.fourtis.io
+
+    root /var/www/sovereign/dist;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # always serve the latest build (single-file game)
+    location = /index.html {
+        add_header Cache-Control "no-cache, must-revalidate";
+    }
+
+    gzip on;
+    gzip_comp_level 6;
+    gzip_types text/html text/css application/javascript image/svg+xml;
+}
+# After enabling: sudo certbot --nginx -d <DOMAIN>
