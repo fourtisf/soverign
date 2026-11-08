@@ -88,15 +88,17 @@ function updateLabels(dt) {
 /* ---------------- save / load ---------------- */
 function rle(a) { const o = []; let v = a[0], c = 1; for (let i = 1; i < a.length; i++) { if (a[i] === v) c++; else { o.push(v, c); v = a[i]; c = 1; } } o.push(v, c); return o; }
 function unrle(r, len) { const a = new Int8Array(len).fill(-1); let p = 0; for (let i = 0; i < r.length; i += 2) { a.fill(r[i], p, p + r[i + 1]); p += r[i + 1]; } return a; }
-const NKEYS = ['id', 'name', 'color', 'flag2', 'fstyle', 'ai', 'leader', 'treasury', 'tax', 'capital', 'approval', 'apprMod', 'tiles', 'hist', 'pol', 'loans', 'ms', 'trades', 'allied', 'rel', 'radius', 'founded', 'acc', 'last', 'rate'];
+const NKEYS = ['id', 'name', 'color', 'flag2', 'fstyle', 'ai', 'leader', 'treasury', 'tax', 'capital', 'approval', 'apprMod', 'tiles', 'hist', 'pol', 'loans', 'ms', 'trades', 'allied', 'rel', 'radius', 'founded', 'acc', 'last', 'rate',
+  'popM', 'dem', 'debtM', 'lowM', 'coalUsed', 'mods', 'pers', 'sanc', 'imfDay', 'sec', 'stake'];
 function saveGame(silent) {
   if (!S.started) return;
   try {
     const data = {
-      v: 1, seed: S.seed, president: S.president, day: S.day, active: S.active, cycle: S.cycle, owner: rle(owner), roads: [...S.roadSet], cleared: [...S.cleared], news: S.news.slice(0, 30),
+      v: 2, seed: S.seed, president: S.president, day: S.day, active: S.active, cycle: S.cycle, owner: rle(owner), roads: [...S.roadSet], cleared: [...S.cleared], news: S.news.slice(0, 30),
+      diff: S.diff, mode: S.mode, over: S.over, won: S.won, ended: S.ended, zones: rle(zone), evq: S.evq, evRecent: S.evRecent, st: S.st,
       nations: S.nations.map(n => { const o = {}; for (const k of NKEYS) o[k] = n[k]; return o; }),
-      blds: [...S.blds.values()].map(b => [b.type, b.x, b.z, b.rot, b.nid, b.level, b.v, Math.round(b.occ), +b.prog.toFixed(3), +b.happy.toFixed(3)]),
-      opts: { dayNight: S.dayNight, sfx: S.sfx, showGrid: S.showGrid, trackOpen: S.trackOpen }, mis: S.mis, cnt: S.cnt, unl: S.unl,
+      blds: [...S.blds.values()].map(b => [b.type, b.x, b.z, b.rot, b.nid, b.level, b.v, Math.round(b.occ), +b.prog.toFixed(3), +b.happy.toFixed(3), b.dmg || 0]),
+      opts: { dayNight: S.dayNight, sfx: S.sfx, showGrid: S.showGrid, trackOpen: S.trackOpen, music: S.music, disasters: S.disasters }, mis: S.mis, cnt: S.cnt, unl: S.unl,
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
     if (!silent) { toast('Permainan tersimpan', dateStr(S.day), 'info', 'save'); sfx('click'); }
@@ -109,14 +111,23 @@ function loadGame(data) {
   owner = unrle(data.owner, MAP * MAP);
   S.president = data.president; S.day = data.day; S.cycle = data.cycle ?? 0.32; S.news = data.news || [];
   Object.assign(S, data.opts || {}); S.mis = data.mis || []; S.cnt = Object.assign({ road: 0, land: 0, up: 0, trade: 0, b: {} }, data.cnt || {}); S.unl = Object.assign({ diplo: false, found: false }, data.unl || {});
+  S.diff = DIFF[data.diff] ? data.diff : 'normal'; S.mode = MODES[data.mode] ? data.mode : 'career';
+  S.over = data.over || null; S.won = data.won || null; S.ended = data.ended || null;
+  S.evq = data.evq || []; S.evRecent = data.evRecent || []; S.st = Object.assign({ months: 0, apprSum: 0, peak: 0, greenM: 0, relSum: 0 }, data.st || {});
+  if (data.zones) zone = Uint8Array.from(unrle(data.zones, MAP * MAP), v => v > 0 && v <= 3 ? v : 0);
   S.nations = data.nations.map(o => makeNation({ ...o, list: [], dirty: true }));
+  for (const n of S.nations) if (!Array.isArray(n.mods)) n.mods = [];
+  assignPersonalities();
   for (const i of data.roads) placeRoad(i);
-  for (const [type, x, z, rot, nid, level, v, occ, prog, happy] of data.blds) {
+  for (const [type, x, z, rot, nid, level, v, occ, prog, happy, dmg] of data.blds) {
     if (!BT[type] || !S.nations[nid]) continue;
     const b = placeBuilding(type, x, z, S.nations[nid], { instant: prog >= 1, rot, level, v, occ });
-    b.happy = happy; if (prog < 1) { b.prog = prog; b.vis = prog; }
+    b.happy = happy; if (prog < 1) { b.prog = prog; b.vis = prog; } else if (dmg > 0) { b.dmg = dmg; S.dmgSet.add(b); addDmgFx(b); }
   }
-  S.active = data.active; enterGame(false);
+  // compute road access, coverage and population right away so the HUD is correct before the first simulated day
+  for (const n of S.nations) { recalcNation(n); n.pop = n.list.reduce((a, b) => a + (BT[b.type].c === 'res' ? b.occ : 0), 0); }
+  S.active = S.nations[data.active] && !S.nations[data.active].ai ? data.active : 0;
+  S.upgraded = !data.v || data.v < 2; enterGame(false);
 }
 
 /* ---------------- game start ---------------- */
@@ -125,23 +136,26 @@ function newGame(cfg) {
   if (cfg.seed !== S.seed || S.cleared.size) { S.cleared = new Set(); generateWorld(cfg.seed); }
   buildGrid();
   const cap = findCapital(0, 40) || findCapital(0);
-  const p = makeNation({ name: cfg.name, color: cfg.color, fstyle: 0, treasury: 25e6, capital: cap, approval: 66, founded: 0 });
+  S.diff = DIFF[cfg.diff] ? cfg.diff : 'normal'; S.mode = MODES[cfg.mode] ? cfg.mode : 'career';
+  const p = makeNation({ name: cfg.name, color: cfg.color, fstyle: 0, treasury: 25e6 * dif().cash, capital: cap, approval: 66, founded: 0 });
   S.nations.push(p); claimCircle(p, cap.x, cap.z, 15);
   const aiCols = ['#fb923c', '#a855f7', '#f43f5e', '#facc15', '#ec4899', '#3b82f6'].filter(c => c !== cfg.color);
   AI_DEFS.forEach((d, k) => {
     const c = findCapital(58) || findCapital(46) || findCapital(32); if (!c) return;
-    const n = makeNation({ ...d, ai: true, color: aiCols[k], treasury: 22e6, capital: c, rel: 40 + Math.floor(Math.random() * 25), approval: 60 });
+    const n = makeNation({ ...d, ai: true, color: aiCols[k], treasury: 22e6 * (S.diff === 'hard' ? 1.2 : S.diff === 'easy' ? 0.85 : 1), capital: c, rel: 40 + Math.floor(Math.random() * 25), approval: 60 });
     S.nations.push(n); claimCircle(n, c.x, c.z, 12);
   });
+  assignPersonalities();
   for (const n of S.nations) starterCity(n, true);
-  for (const n of S.nations) simNation(n);
+  for (const n of S.nations) { simNation(n); n.popM = n.pop; }
   S.active = 0; addNews(`${presName()} dilantik sebagai pemimpin ${p.name}.`);
   enterGame(true);
 }
 function enterGame(fresh) {
   S.started = true; $('#title').classList.add('hidden'); $('#hud').classList.remove('hidden');
   renderNationCard(); buildStats(); renderStats(); renderTime(); renderMenu(); renderTools(); renderMMBar(); trackKey = ''; renderTracker(); renderRCI(); renderLegend();
-  S.terrDirty = true; mmDirty = true; carsDirty = true;
+  S.terrDirty = true; mmDirty = true; carsDirty = true; S.zoneDirty = true; S.dmgDirty = true; renderChips();
+  if (S.music) setMusic(true);
   const n = act(); flyTo(n.capital.x, n.capital.z, 34); cam.gpitch = 0.86;
   if (fresh) {
     const facilities = ['Istana Presiden', 'Sekolah', 'Puskesmas', 'Kantor Polisi', 'Pemadam Kebakaran', 'Menara Air ×2', 'Ladang Surya', 'Turbin Angin ×3', 'Taman Kota ×2', '4 Apartemen', '16 Rumah', '5 Ruko', 'Pertanian', 'Jaringan jalan'];
@@ -151,17 +165,26 @@ function enterGame(fresh) {
       <span class="flbl">Fasilitas yang sudah diberikan</span><div class="row" style="flex-wrap:wrap;gap:6px">${facilities.map(f => `<span class="pill ok">${f}</span>`).join('')}</div>
       <span class="flbl">Cara bermain</span><div class="lst" style="font-size:12.5px">
       <div class="kv"><span>1 · Bangun jalan</span><span>Semua bangunan butuh akses jalan</span></div>
-      <div class="kv"><span>2 · Hunian + pekerjaan</span><span>Rumah menarik warga, ruko & industri membuka lapangan kerja</span></div>
+      <div class="kv"><span>2 · Hunian + pekerjaan</span><span>Rumah menarik warga, ruko & industri membuka lapangan kerja. Pakai <b>Zonasi (Z)</b> agar swasta ikut membangun</span></div>
       <div class="kv"><span>3 · Listrik, air & layanan</span><span>Jaga pasokan & cakupan sekolah/RS/polisi</span></div>
       <div class="kv"><span>4 · Capai tonggak</span><span>Dapat hibah & membuka gedung baru (mal, bandara, menara…)</span></div>
-      <div class="kv"><span>5 · Fokus negaramu dulu</span><span>Diplomasi terbuka di 5.000 penduduk, negara baru di 25.000</span></div></div>
+      <div class="kv"><span>5 · Fokus negaramu dulu</span><span>Diplomasi terbuka di 5.000 penduduk, negara baru di 25.000</span></div>
+      ${career() ? `<div class="kv"><span>6 · Mode Karier · ${dif().n}</span><span>Rakyat menuntut kemajuan. Kalah jika bangkrut, dimakzulkan, atau kalah pemilu. Menang dengan menjadi <b>Negara Adidaya</b></span></div>` : `<div class="kv"><span>6 · Mode Bebas</span><span>Tanpa game over — bangun sesukamu</span></div>`}</div>
       <div class="box" style="margin-top:12px;display:flex;gap:10px;align-items:center"><div class="tri">${ico('target')}</div><div style="font-size:12.5px"><b>Ikuti Program Kerja</b> di kiri atas — target bertahap dengan hadiah dana. Klik salah satu target untuk langsung membangun.</div></div>`,
       buttons: [{ l: `${ico('play')} Mulai memerintah`, pri: 1 }]
     }), 900);
+  } else if (S.over) { S.paused = true; queueModal(showGameOver); }
+  else if (S.upgraded) {
+    S.upgraded = false;
+    setTimeout(() => modal({
+      title: 'SOVEREIGN v0.3 — yang baru', sub: `Simpananmu dilanjutkan dalam mode Karier · ${dif().n}`, icon: 'sparkle', wide: 1,
+      html: `<div class="lst" style="font-size:12.5px">${[['Tantangan nyata', 'Tuntutan rakyat, krisis fiskal & bailout IMF, pemakzulan, pemilu yang bisa kalah'], ['Menang & ending', 'Jadilah Negara Adidaya, atau tuntaskan masa bakti 20 tahun dan dapatkan gelar sejarah'], ['Tetangga yang hidup', 'AI berkepribadian, upgrade gedung, tarif, sanksi, tuntutan wilayah, tawaran dagang'], ['Keputusan berdampak', 'Event berantai dengan efek berbulan-bulan + 7 kebijakan baru'], ['Zonasi & peremajaan', 'Tandai zona (Z), swasta membangun sendiri; upgrade otomatis lewat kebijakan'], ['Kota yang hidup', 'Kemacetan, nilai tanah, bencana, musik latar, pengaturan grafis, ekspor/impor simpanan']].map(x => `<div class="kv"><span>${x[0]}</span><span>${x[1]}</span></div>`).join('')}</div>`,
+      buttons: [{ l: `${ico('play')} Lanjutkan`, pri: 1 }]
+    }), 700);
   } else toast(`Selamat datang kembali, ${presName()}`, dateStr(S.day), 'info', 'crown');
 }
 function renderTitle() {
-  const save = readSave(); let col = NCOLORS[0];
+  const save = readSave(); let col = NCOLORS[0], mode = 'career', diff = 'normal';
   $('#title').innerHTML = `<div class="tp">
     <div class="kick">Nation Builder · 3D</div>
     <div class="logo">SOVEREIGN</div>
@@ -170,18 +193,24 @@ function renderTitle() {
       <label class="flbl" style="margin-top:0">Nama Presiden</label><input class="tinput" id="tPres" maxlength="24" placeholder="Nama kamu">
       <label class="flbl">Nama Negara</label><input class="tinput" id="tNat" maxlength="32" value="Republik Fajar">
       <label class="flbl">Warna Bendera</label><div class="swatch" id="tSw">${NCOLORS.map(c => `<button data-c="${c}" style="background:${c}" class="${c === col ? 'on' : ''}"></button>`).join('')}</div>
+      <label class="flbl">Mode</label><div class="seg" id="tMode">${Object.keys(MODES).map(k => `<button data-v="${k}" class="${k === mode ? 'on' : ''}"><b>${MODES[k].n}</b><small>${MODES[k].d}</small></button>`).join('')}</div>
+      <label class="flbl">Tingkat kesulitan</label><div class="seg s3" id="tDiff">${Object.keys(DIFF).map(k => `<button data-v="${k}" class="${k === diff ? 'on' : ''}"><b>${DIFF[k].n}</b><small>${DIFF[k].d}</small></button>`).join('')}</div>
       <label class="flbl">Kode Peta Dunia</label><div class="seed"><input class="tinput num" id="tSeed" value="${S.seed}" inputmode="numeric"><button class="btn" id="tRoll" style="height:46px">${ico('rotate')} Acak</button></div>
       <div class="trow"><button class="btn pri f1" id="tStart" style="height:48px">${ico('crown')} Mulai Memerintah</button>${save ? `<button class="btn" id="tCont" style="height:48px">${ico('play')} Lanjutkan</button>` : ''}</div>
-      ${save ? `<div class="ms" style="margin-top:10px">Simpanan: ${esc(save.nations?.[save.active]?.name || '')} · ${dateStr(save.day || 0)}</div>` : ''}
+      ${save ? `<div class="ms" style="margin-top:10px">Simpanan: ${esc(save.nations?.[save.active]?.name || '')} · ${dateStr(save.day || 0)}${save.over ? ' · masa jabatan berakhir' : ''}</div>` : ''}
+      <button class="btn sm" id="tImp" style="margin-top:10px">${ico('upload')} Impor simpanan (.json)</button>
     </div>
     <div class="feat"><div>${ico('map')} Benua 160×160</div><div>${ico('home')} 38 jenis bangunan</div><div>${ico('flag')} Multi-negara</div><div>${ico('sun')} Siang & malam</div></div>
   </div>`;
   $('#title').classList.remove('hidden');
   $('#tSw').querySelectorAll('[data-c]').forEach(b => b.onclick = () => { col = b.dataset.c; $('#tSw').querySelectorAll('[data-c]').forEach(x => x.classList.toggle('on', x === b)); });
+  const seg = (id, set) => $(id).querySelectorAll('[data-v]').forEach(b => b.onclick = () => { set(b.dataset.v); $(id).querySelectorAll('[data-v]').forEach(x => x.classList.toggle('on', x === b)); sfx('click'); });
+  seg('#tMode', v => mode = v); seg('#tDiff', v => diff = v);
+  $('#tImp').onclick = importSave;
   const reseed = v => { const s = (parseInt(v) >>> 0) || 1; if (s !== S.seed) { S.cleared = new Set(); generateWorld(s); } $('#tSeed').value = S.seed; };
   $('#tRoll').onclick = () => reseed(Math.floor(Math.random() * 1e6));
   $('#tSeed').onchange = e => reseed(e.target.value);
-  $('#tStart').onclick = () => { sfx('click'); reseed($('#tSeed').value); newGame({ president: ($('#tPres').value || '').trim(), name: ($('#tNat').value || '').trim() || 'Republik Fajar', color: col, seed: S.seed }); };
+  $('#tStart').onclick = () => { sfx('click'); reseed($('#tSeed').value); newGame({ president: ($('#tPres').value || '').trim(), name: ($('#tNat').value || '').trim() || 'Republik Fajar', color: col, seed: S.seed, mode, diff }); };
   const c = $('#tCont'); if (c) c.onclick = () => { sfx('click'); loadGame(save); };
 }
 
@@ -217,7 +246,9 @@ function loop(now) {
   if (S.terrDirty) { rebuildTerritory(); if (W.tFill) W.tFill.visible = S.political || S.tool.mode === 'land' || S.tool.mode === 'found'; }
   updateLabels(dt);
   if (S.started) {
-    uiT += dt; if (uiT > 0.25) { uiT = 0; renderStats(); renderTime(); renderTracker(); renderRCI(); if (S.selected && S.selected.b) renderInfoLive(); }
+    uiT += dt; if (uiT > 0.25) { uiT = 0; renderStats(); renderTime(); renderTracker(); renderRCI(); renderChips(); pumpModal(); if (S.selected && S.selected.b) renderInfoLive(); }
+    if (S.zoneDirty) rebuildZones();
+    if (S.dmgDirty) { S.dmgDirty = false; paintOverlay(); }
     pbT += dt; if (pbT > 0.6) { pbT = 0; updateProblems(); }
     ovT += dt; if (S.overlay && ovT > 1.2) { ovT = 0; paintOverlay(); buildOvField(); }
     bobProblems(now / 1000);
@@ -229,11 +260,12 @@ function loop(now) {
 }
 let infoT = 0;
 function renderInfoLive() { infoT++; if (infoT % 2) return; const a = document.activeElement; if (a && a.closest && a.closest('#info')) return; if ($('#info').matches(':hover') && document.querySelector('#info .btn:hover')) return; renderInfo(); }
-addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); pMesh.material.uniforms.uScale.value = innerHeight * 0.55; });
+addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); if (pMesh) pMesh.material.uniforms.uScale.value = innerHeight * 0.55; });
 
 /* ---------------- init ---------------- */
 async function init() {
   const prog = (p, t) => { $('#lprog').style.width = p + '%'; $('#ltxt').textContent = t; return new Promise(r => setTimeout(r, 30)); };
+  initGfx();
   await prog(10, 'Membentuk benua…');
   const save = readSave(); S.seed = save ? save.seed : Math.floor(Math.random() * 1e6);
   if (save) S.cleared = new Set(save.cleared || []);
@@ -245,6 +277,7 @@ async function init() {
   await prog(95, 'Hampir siap…');
   applyCam(); requestAnimationFrame(loop);
   setTimeout(() => { $('#loading').style.opacity = 0; setTimeout(() => $('#loading').remove(), 650); renderTitle(); }, 250);
-  if (new URLSearchParams(location.search).has('debug')) window.__game = { THREE, camera, checkSite, touchesRoad, setOverlay, checkUnlocks, S, act, placeBuilding, placeRoad, simDay, BT, cam, setTool, pickCat, openStats, openDiplo, openPolicy, openNations, owner: () => owner, terr: () => terr, ix, newGame, flyTo };
+  if (new URLSearchParams(location.search).has('debug')) window.__game = { THREE, camera, checkSite, touchesRoad, setOverlay, checkUnlocks, S, act, placeBuilding, placeRoad, simDay, BT, cam, setTool, pickCat, openStats, openDiplo, openPolicy, openNations, owner: () => owner, terr: () => terr, ix, newGame, flyTo,
+    aiAct, animBuildings, autoUpgrade, zoneDev, paintZoneTiles, zone: () => zone, runDisaster, DISASTERS, damageB, repairB, EVENTS, runEvent, gameOver, checkEndings, victoryState, scoreOf, styleOf, ranking, natMods, demand, saveGame, readSave, loadGame, applyGfx, setMusic, MUS, aiDiplomacy, tariffEvent, demandEvent, queueModal, pumpModal, DIFF, monthEnd, nationFails, foundNation: (t, nm) => foundNation(t, nm, '#ec4899', 1), playerNations };
 }
 init().catch(e => { console.error(e); $('#ltxt').textContent = 'Gagal memuat: ' + e.message; });

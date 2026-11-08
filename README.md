@@ -2,6 +2,8 @@
 
 Game nation builder 3D di browser. Kamu jadi presiden: mulai dengan lahan, modal, dan fasilitas dasar, lalu bangun negaramu. Setelah negaramu maju, buka diplomasi dan dirikan hingga 5 negara.
 
+**Baru di v0.3:** mode Karier (bisa menang & kalah) atau Bebas, 3 tingkat kesulitan, tuntutan rakyat, krisis fiskal & bailout IMF, pemakzulan, pemilu yang bisa kalah, kemenangan Negara Adidaya & gelar sejarah; tetangga AI berkepribadian (tarif, sanksi, tuntutan wilayah); 24 event berantai dengan efek berbulan-bulan; 7 kebijakan baru; zonasi (Z) & peremajaan otomatis; kemacetan, nilai tanah, bencana alam; musik latar; pengaturan grafis; ekspor/impor simpanan.
+
 ## Mainkan
 - **Online (gratis, tanpa domain/server):** https://fourtisf.github.io/soverign/ — di-deploy otomatis oleh GitHub Pages setiap ada push ke branch default. Aktifkan sekali di **Settings → Pages → Source: GitHub Actions**.
 - **Langsung:** buka `dist/index.html` di Chrome (butuh internet untuk Three.js & font).

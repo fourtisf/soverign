@@ -54,11 +54,11 @@ function checkMissions() {
   if (!S.started) return;
   for (const m of activeMissions()) {
     const [c, t] = m.p(); if (c < t) continue;
-    S.mis.push(m.id); const n = act(); n.treasury += m.r; trackKey = '';
+    S.mis.push(m.id); const n = act(); n.treasury += m.r; trackKey = ''; relieve(n, 3);
     toast(`Program kerja tuntas: ${m.t}`, `Hadiah ${money(m.r)} masuk kas ${n.name}`, 'gold', 'check'); sfx('coin'); addNews(`Program kerja "${m.t}" tuntas.`);
     if (MISSIONS.filter(x => x.ch === m.ch).every(x => S.mis.includes(x.id))) {
-      n.treasury += CH_BONUS[m.ch]; addNews(`${CHAPTERS[m.ch]} selesai.`); const next = CHAPTERS[m.ch + 1];
-      if ($('#modal').classList.contains('hidden')) modal({ title: `${CHAPTERS[m.ch]} selesai!`, sub: `Bonus bab ${money(CH_BONUS[m.ch])} diterima.`, icon: 'sparkle', html: next ? `<p>Babak baru dimulai: <b>${next}</b>. Target berikutnya ada di panel Program Kerja (kiri atas).</p>` : '<p>Semua program kerja tuntas. Negaramu kini adidaya!</p>', buttons: [{ l: 'Lanjutkan', pri: 1 }] });
+      n.treasury += CH_BONUS[m.ch]; relieve(n, 8); addNews(`${CHAPTERS[m.ch]} selesai.`); const next = CHAPTERS[m.ch + 1];
+      if ($('#modal').classList.contains('hidden')) modal({ title: `${CHAPTERS[m.ch]} selesai!`, sub: `Bonus bab ${money(CH_BONUS[m.ch])} diterima.`, icon: 'sparkle', html: next ? `<p>Babak baru dimulai: <b>${next}</b>. Target berikutnya ada di panel Program Kerja (kiri atas).</p>` : (career() ? '<p>Semua program kerja tuntas! Langkah terakhir menuju <b>Negara Adidaya</b>: lihat syaratnya di Statistik → Target & Peringkat.</p>' : '<p>Semua program kerja tuntas. Negaramu kini adidaya!</p>'), buttons: [{ l: 'Lanjutkan', pri: 1 }] });
       else toast(`${CHAPTERS[m.ch]} selesai!`, `Bonus ${money(CH_BONUS[m.ch])}`, 'gold', 'sparkle');
     }
     break;
@@ -128,7 +128,7 @@ function renderRCI() {
 }
 
 /* ---------------- data views ---------------- */
-const OVL = [['hap', 'smile', 'Kebahagiaan'], ['edu', 'cap', 'Pendidikan'], ['health', 'heart', 'Kesehatan'], ['safety', 'shield', 'Keamanan'], ['fire', 'flame', 'Pemadam'], ['poll', 'factory', 'Polusi'], ['access', 'road', 'Akses & utilitas']];
+const OVL = [['hap', 'smile', 'Kebahagiaan'], ['land', 'coins', 'Nilai tanah'], ['edu', 'cap', 'Pendidikan'], ['health', 'heart', 'Kesehatan'], ['safety', 'shield', 'Keamanan'], ['fire', 'flame', 'Pemadam'], ['poll', 'factory', 'Polusi'], ['access', 'road', 'Akses & utilitas']];
 const OC = { bad: new THREE.Color('#ff4d6a'), mid: new THREE.Color('#ffc53d'), good: new THREE.Color('#2ee6a0'), dim: new THREE.Color('#5d6878'), svc: new THREE.Color('#7dd3fc'), white: new THREE.Color('#ffffff') };
 const _oc = new THREE.Color();
 function ramp(v, out = _oc) { v = clamp(v, 0, 1); return v < 0.5 ? out.copy(OC.bad).lerp(OC.mid, v * 2) : out.copy(OC.mid).lerp(OC.good, (v - 0.5) * 2); }
@@ -138,10 +138,11 @@ function ovColor(b, mode) {
   if (mode === 'access') { if (d.road !== false && !b.conn) return OC.bad; if ((d.pw && n.pr < 0.999) || (d.wt && n.wr < 0.999)) return OC.mid; return OC.good; }
   if (d.c !== 'res') { if (mode === 'poll' && d.poll) return OC.bad; if (d.svc === mode) return OC.svc; return OC.dim; }
   if (mode === 'hap') return ramp(b.happy);
+  if (mode === 'land') return ramp(b.lval ?? 0.5);
   if (mode === 'poll') return ramp(1 - b.poll * 2.5);
   return ramp(b.cov[mode] || 0);
 }
-function paintOverlay() { const mode = S.overlay; for (const p of pools.values()) { if (p.key.startsWith('road|') || p.key === 'rotor' || !p.n) continue; p.paint(e => mode ? ovColor(e, mode) : OC.white, !mode); } }
+function paintOverlay() { const mode = S.overlay, dm = S.dmgSet.size > 0; for (const p of pools.values()) { if (p.key.startsWith('road|') || p.key === 'rotor' || !p.n) continue; p.paint(e => mode ? ovColor(e, mode) : e.dmg ? DMGC : OC.white, !mode && !dm); } }
 const ovFieldMat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, toneMapped: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
 function buildOvField() {
   if (W.ovMesh) { fxG.remove(W.ovMesh); W.ovMesh.geometry.dispose(); W.ovMesh = null; }
@@ -180,7 +181,7 @@ function renderDPop() {
 }
 function renderLegend() {
   const el = $('#ovLeg'); if (!el) return; const m = S.overlay; if (!m) { el.classList.add('hidden'); return; }
-  const o = OVL.find(x => x[0] === m), L = m === 'poll' ? ['Tercemar', 'Bersih'] : m === 'access' ? ['Tanpa jalan', 'Normal'] : ['Buruk', 'Baik'];
+  const o = OVL.find(x => x[0] === m), L = m === 'poll' ? ['Tercemar', 'Bersih'] : m === 'access' ? ['Tanpa jalan', 'Normal'] : m === 'land' ? ['Rendah', 'Tinggi'] : ['Buruk', 'Baik'];
   el.innerHTML = `<b>Peta data · ${o[2]}</b><div class="lg"><span>${L[0]}</span><i></i><span>${L[1]}</span></div>`; el.classList.remove('hidden');
 }
 
@@ -188,10 +189,10 @@ function renderLegend() {
 const probTexC = {}, probSpr = [];
 function probTex(kind) {
   if (probTexC[kind]) return probTexC[kind];
-  const cv = document.createElement('canvas'); cv.width = cv.height = 96; const x = cv.getContext('2d'), col = { road: '#fb7185', power: '#fbbf24', water: '#38bdf8' }[kind];
+  const cv = document.createElement('canvas'); cv.width = cv.height = 96; const x = cv.getContext('2d'), col = { road: '#fb7185', power: '#fbbf24', water: '#38bdf8', dmg: '#fb923c' }[kind];
   x.beginPath(); x.moveTo(36, 70); x.lineTo(48, 90); x.lineTo(60, 70); x.fillStyle = col; x.fill();
   x.beginPath(); x.arc(48, 42, 34, 0, 7); x.fillStyle = 'rgba(8,16,30,.93)'; x.fill(); x.lineWidth = 5; x.strokeStyle = col; x.stroke();
-  const ds = (I[{ road: 'road', power: 'bolt', water: 'drop' }[kind]].match(/ d="([^"]+)"/g) || []).map(s => s.slice(4, -1));
+  const ds = (I[{ road: 'road', power: 'bolt', water: 'drop', dmg: 'flame' }[kind]].match(/ d="([^"]+)"/g) || []).map(s => s.slice(4, -1));
   x.save(); x.translate(48 - 19.2, 42 - 19.2); x.scale(1.6, 1.6); x.strokeStyle = '#fff'; x.lineWidth = 2.3; x.lineCap = 'round'; x.lineJoin = 'round'; for (const d of ds) x.stroke(new Path2D(d)); x.restore();
   const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return probTexC[kind] = t;
 }
@@ -201,7 +202,7 @@ function updateProblems() {
     const n = act();
     for (const b of n.list) {
       if (b.prog < 1) continue; const d = BT[b.type]; let kind = null;
-      if (d.road !== false && !b.conn) kind = 'road'; else if (d.pw && n.pr < 0.999) kind = 'power'; else if (d.wt && n.wr < 0.999) kind = 'water';
+      if (b.dmg) kind = 'dmg'; else if (d.road !== false && !b.conn) kind = 'road'; else if (d.pw && n.pr < 0.999) kind = 'power'; else if (d.wt && n.wr < 0.999) kind = 'water';
       if (!kind) continue;
       let sp = probSpr[k]; if (!sp) { sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: probTex(kind), depthTest: false, transparent: true, toneMapped: false })); sp.renderOrder = 12; fxG.add(sp); probSpr[k] = sp; }
       if (sp.material.map !== probTex(kind)) sp.material.map = probTex(kind);

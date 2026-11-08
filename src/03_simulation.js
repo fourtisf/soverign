@@ -51,7 +51,7 @@ function placeBuilding(type, x, z, n, o = {}) {
   if (type === 'port') { const r = portRot(x, z, d.s); rot = r < 0 ? 0 : r; }
   const b = { id: S.nextId++, type, x, z, s: d.s, rot, nid: n.id, level: o.level || 1, v: o.v ?? Math.floor(Math.random() * (VARS[type] || 1)), prog: o.instant ? 1 : 0, vis: o.instant ? 1 : 0, occ: o.occ || 0, happy: 0.6, conn: false, active: false, cov: { edu: 0, health: 0, safety: 0, fire: 0, park: 0, land: 0 }, poll: 0 };
   for (let dz = 0; dz < d.s; dz++) for (let dx = 0; dx < d.s; dx++) { const i = ix(x + dx, z + dz); tileB[i] = b.id; clearTrees(i); }
-  S.blds.set(b.id, b); n.list.push(b); attachVisual(b);
+  S.blds.set(b.id, b); n.list.push(b); attachVisual(b); S.zoneDirty = true;
   if (b.prog >= 1) finishBuilding(b, true); else S.building.push(b);
   markAllDirty(); return b;
 }
@@ -64,7 +64,8 @@ function finishBuilding(b, silent) {
     const [cx, cz] = rotLocal(b, 0, 0); for (let k = 0; k < 14; k++) emitP(cx + (Math.random() - 0.5) * b.s, 0.1, cz + (Math.random() - 0.5) * b.s, { vx: (Math.random() - 0.5) * 0.6, vy: 0.3 + Math.random() * 0.4, vz: (Math.random() - 0.5) * 0.6, max: 1.4, s0: 0.5, s1: 1.6, a0: 0.55, c: [0.85, 0.78, 0.66] });
     if (nationOf(b).ai) return;
     sfx('done');
-    const d = BT[b.type]; if (d.cost >= 1e6 || d.c === 'lm') { toast(`${d.n} selesai dibangun`, nationOf(b).name, 'gold', 'sparkle'); addNews(`${d.n} resmi beroperasi di ${nationOf(b).name}.`); }
+    const d = BT[b.type]; if (d.c === 'lm') relieve(nationOf(b), 6);
+    if (d.cost >= 1e6 || d.c === 'lm') { toast(`${d.n} selesai dibangun`, nationOf(b).name, 'gold', 'sparkle'); addNews(`${d.n} resmi beroperasi di ${nationOf(b).name}.`); }
   }
 }
 function removeBuilding(b) {
@@ -72,12 +73,12 @@ function removeBuilding(b) {
   if (b.rotor) { b.rotor._pool.remove(b.rotor); b.rotor = null; S.winds = S.winds.filter(w => w !== b); }
   S.emitters = S.emitters.filter(e => e.b !== b); S.building = S.building.filter(x => x !== b);
   for (let dz = 0; dz < b.s; dz++) for (let dx = 0; dx < b.s; dx++) { const i = ix(b.x + dx, b.z + dz); if (tileB[i] === b.id) tileB[i] = 0; }
-  S.blds.delete(b.id); const n = nationOf(b); const k = n.list.indexOf(b); if (k >= 0) n.list.splice(k, 1);
+  S.blds.delete(b.id); S.dmgSet.delete(b); S.zoneDirty = true; const n = nationOf(b); const k = n.list.indexOf(b); if (k >= 0) n.list.splice(k, 1);
   markAllDirty(); if (S.selected && S.selected.b === b) closeInfo();
 }
 function upgradeCost(b) { return Math.round(BT[b.type].cost * LVC[b.level]); }
 function upgradeBuilding(b) {
-  const d = BT[b.type], n = nationOf(b); if (b.level >= (d.lv || 1) || b.prog < 1) return;
+  const d = BT[b.type], n = nationOf(b); if (b.level >= (d.lv || 1) || b.prog < 1 || b.dmg) return;
   const c = upgradeCost(b); if (n.treasury < c) { toast('Dana tidak cukup', `Butuh ${money(c)}`, 'bad', 'alert'); sfx('error'); return; }
   n.treasury -= c; b._pool.remove(b); S.emitters = S.emitters.filter(e => e.b !== b);
   b.level++; b.vis = 0.3; b.upg = true; attachVisual(b); S.building.push(b);
@@ -90,7 +91,7 @@ function animBuildings(dt) {
     if (b.prog < 1) { b.prog = Math.min(1, b.prog + dt * sp / (DAY_SEC * (d.days || 2))); b.vis = b.prog; }
     else b.vis = Math.min(1, b.vis + dt * sp / (DAY_SEC * 2));
     if (b._pool) b._pool.set(b, bMatrix(b, easeOut(Math.max(0.02, b.vis))));
-    if (b.vis >= 1) { S.building.splice(k, 1); if (b.upg) { b.upg = false; finishBuilding(b, true); sfx('done'); } else finishBuilding(b, false); }
+    if (b.vis >= 1) { S.building.splice(k, 1); if (b.upg) { b.upg = false; finishBuilding(b, true); if (!nationOf(b).ai) sfx('done'); } else finishBuilding(b, false); }
   }
 }
 /* ---------------- roads ---------------- */
@@ -106,7 +107,7 @@ function refreshRoad(i) {
 function placeRoad(i) {
   if (road[i]) return; road[i] = 1; S.roadSet.add(i); clearTrees(i); refreshRoad(i);
   const x = i % MAP, z = (i / MAP) | 0; for (const [dx, dz] of DIRS) if (inb(x + dx, z + dz)) refreshRoad(ix(x + dx, z + dz));
-  markAllDirty(); carsDirty = true;
+  markAllDirty(); carsDirty = true; S.zoneDirty = true;
 }
 function removeRoad(i) {
   if (!road[i]) return; road[i] = 0; S.roadSet.delete(i); refreshRoad(i);
@@ -190,7 +191,8 @@ function makeNation(o) {
     id: S.nations.length, name: '', color: '#22d3ee', flag2: '#f3f5f8', fstyle: 0, ai: false, leader: '', treasury: 0, tax: 10,
     capital: { x: 0, z: 0 }, list: [], pop: 0, cap: 0, happy: 0.6, approval: 62, apprMod: 0, workers: 0, jobs: 0, employed: 0, fill: 0, unemp: 0,
     ps: 0, pd: 0, ws: 0, wd: 0, pr: 1, wr: 1, roads: 0, tiles: 0, rate: { inc: {}, exp: {}, net: 0 }, acc: { inc: {}, exp: {} }, last: null, hist: [],
-    pol: {}, loans: [], ms: 0, trades: [], allied: false, rel: 50, dirty: true, radius: 12, founded: S.day, popM: 0
+    pol: {}, loans: [], ms: 0, trades: [], allied: false, rel: 50, dirty: true, radius: 12, founded: S.day, popM: 0,
+    dem: 0, debtM: 0, lowM: 0, coalUsed: 0, mods: [], pers: null, sanc: 0, cong: 0, imfDay: -9999
   }, o);
 }
 function spotScore(cx, cz, r) {
@@ -253,7 +255,7 @@ function recalcNation(n) {
   n.dirty = false;
   for (const b of n.list) b.conn = touchesRoad(b.x, b.z, b.s);
   const res = [], src = [];
-  for (const b of n.list) { const d = BT[b.type]; if (d.c === 'res') res.push(b); if (b.prog >= 1 && (d.svc || d.hap || d.poll) && (d.road === false || b.conn)) src.push(b); }
+  for (const b of n.list) { const d = BT[b.type]; if (d.c === 'res') res.push(b); if (b.prog >= 1 && !b.dmg && (d.svc || d.hap || d.poll) && (d.road === false || b.conn)) src.push(b); }
   for (const r of res) {
     const cv = { edu: 0, health: 0, safety: 0, fire: 0, park: 0, land: 0 }; let poll = 0; const rx = r.x + r.s / 2, rz = r.z + r.s / 2;
     for (const s of src) {
@@ -262,16 +264,17 @@ function recalcNation(n) {
       if (d.hap && dist <= d.r) { const v = d.hap * (1 - dist / d.r * 0.5); if (d.c === 'lm' || d.c === 'gov') cv.land += v; else cv.park += v; }
       if (d.poll && dist < 8) poll += d.poll * (1 - dist / 8) * 0.022;
     }
-    r.cov = cv; r.poll = Math.min(0.5, poll);
+    r.cov = cv; r.poll = Math.min(0.5, poll); r.lval = landValue(r);
   }
   let rc = 0; for (const i of S.roadSet) if (owner[i] === n.id) rc++; n.roads = rc;
 }
 const sumObj = o => Object.values(o || {}).reduce((a, b) => a + b, 0);
 function simNation(n) {
   if (n.dirty) recalcNation(n);
+  const M = natMods(n);
   let ps = 0, pd = 0, ws = 0, wd = 0, jobs = 0;
   for (const b of n.list) {
-    if (b.prog < 1) continue; const d = BT[b.type]; b.active = d.road === false || b.conn; if (!b.active) continue;
+    if (b.prog < 1) continue; const d = BT[b.type]; b.active = (d.road === false || b.conn) && !b.dmg; if (!b.active) continue;
     const lu = LVU[b.level - 1]; ps += d.pgen || 0; ws += d.wgen || 0; pd += (d.pw || 0) * lu; wd += (d.wt || 0) * lu; jobs += jobsOf(b);
   }
   const pr = pd > 0 ? Math.min(1, ps / pd) : 1, wr = wd > 0 ? Math.min(1, ws / wd) : 1;
@@ -287,32 +290,34 @@ function simNation(n) {
     else {
       const cv = b.cov;
       let h = 0.4 + cv.edu * (n.pol.edu ? 0.2 : 0.12) + cv.health * 0.13 + cv.safety * 0.11 + cv.fire * 0.06 + Math.min(0.22, cv.park) + Math.min(0.2, cv.land)
-        - b.poll * (n.pol.green ? 0.4 : 1) - taxPen - (1 - pr) * 0.4 - (1 - wr) * 0.4 + polH;
+        - b.poll * (n.pol.green ? 0.4 : 1) - taxPen - (1 - pr) * 0.4 - (1 - wr) * 0.4 + polH + M.hap;
       h = clamp(h, 0, 1); b.happy += (h - b.happy) * 0.12;
       const tgt = Cp * clamp(0.18 + 0.9 * b.happy - u * 0.7, 0.04, 1);
       b.occ = clamp(b.occ + (tgt - b.occ) * 0.045, 0, Cp);
     }
-    pop += b.occ; hs += b.happy * b.occ; taxBase += b.occ * (d.taxm || 1);
+    pop += b.occ; hs += b.happy * b.occ; taxBase += b.occ * (d.taxm || 1) * (0.7 + 0.5 * (b.lval ?? 0.6));
   }
   n.pop = pop; n.cap = cap; n.happy = pop > 0 ? hs / pop : 0.5;
   n.workers = pop * 0.55; n.jobs = jobs; n.employed = Math.min(n.workers, jobs); const fill = jobs > 0 ? n.employed / jobs : 0; n.fill = fill;
+  n.cong = n.roads > 0 ? n.employed / (n.roads * 220 * (n.pol.transit ? 2 : 1)) : 0;
   const tf = n.tax / 10; let com = 0, ind = 0, tour = 0, trade = 0, upk = 0, air = false, appr = 0;
   for (const b of n.list) {
     const d = BT[b.type]; if (b.prog < 1) continue; upk += (d.up || 0) * LVU[b.level - 1]; if (!b.active) continue;
     if (d.rev) { const r = jobsOf(b) * fill * d.rev * tf * (0.4 + 0.6 * pr) * (n.pol.sez ? 1.2 : 1); if (d.c === 'ind') ind += r; else com += r; }
     if (d.tour) tour += d.tour; if (d.trade) trade += d.trade; if (d.tourm) air = true; if (d.appr) appr += d.appr;
   }
-  tour *= (0.6 + n.happy * 0.8) * (air ? 1.5 : 1) * (n.pol.tour ? 1.4 : 1);
+  com *= M.com; ind *= M.ind;
+  tour *= (0.6 + n.happy * 0.8) * (air ? 1.5 : 1) * (n.pol.tour ? 1.4 : 1) * M.tour;
   for (const id of n.trades) { const a = S.nations[id]; if (a) trade += Math.sqrt(Math.max(1, n.pop) * Math.max(1, a.pop)) * 9 * ((a.allied || n.allied) ? 1.3 : 1); }
-  upk += n.roads * 25;
+  trade *= M.trade; upk = (upk + n.roads * 25) * M.upk;
   let polc = 0; for (const k in n.pol) if (n.pol[k]) polc += POL[k].cost(n);
   let loan = 0; for (const L of n.loans) loan += L.pay;
-  const taxI = taxBase * 3.5 * n.tax;
+  const taxI = taxBase * 3.5 * n.tax * M.tax;
   const inc = { tax: taxI, com, ind, tour, trade }, exp = { upk, pol: polc, loan };
   n.rate = { inc, exp, net: taxI + com + ind + tour + trade - upk - polc - loan };
   n.treasury += n.rate.net / 30;
   for (const k in inc) n.acc.inc[k] = (n.acc.inc[k] || 0) + inc[k] / 30; for (const k in exp) n.acc.exp[k] = (n.acc.exp[k] || 0) + exp[k] / 30;
-  const tgtA = clamp(n.happy * 64 + (1 - u) * 22 + (n.treasury >= 0 ? 10 : -12) + n.apprMod + appr + (n.allied ? 2 : 0), 0, 100);
+  const tgtA = clamp(n.happy * 64 + (1 - u) * 22 + (n.treasury >= 0 ? 10 : -12) + n.apprMod + appr + (n.allied ? 2 : 0) + M.appr - (n.dem || 0), 0, 100);
   n.approval += (tgtA - n.approval) * 0.035; n.apprMod *= 0.993;
   if (!n.ai && n.id === S.active && S.started && S.day > 3) {
     const lp = n.pr < 0.999, lw = n.wr < 0.999;
@@ -321,7 +326,7 @@ function simNation(n) {
   }
   if (!n.ai) {
     while (n.ms < MILESTONES.length && n.pop >= MILESTONES[n.ms][0]) {
-      const [p, g] = MILESTONES[n.ms++]; n.treasury += g;
+      const [p, g] = MILESTONES[n.ms++]; n.treasury += g; relieve(n, 10);
       toast(`Tonggak ${fmtPop(p)} penduduk!`, `Hibah pembangunan ${money(g)} · bangunan baru terbuka`, 'gold', 'sparkle'); sfx('coin'); addNews(`${n.name} mencapai ${fmtPop(p)} penduduk.`);
       if (n.id === S.active) refreshDrawer();
     }
@@ -331,7 +336,7 @@ function simDay() {
   S.day++;
   for (const n of S.nations) simNation(n);
   for (const n of S.nations) if (n.ai && (S.day + n.id) % 2 === 0) aiAct(n);
-  checkUnlocks(); checkMissions();
+  checkUnlocks(); checkMissions(); govDay();
   if (S.day % 30 === 0) monthEnd();
 }
 function monthEnd() {
@@ -340,25 +345,31 @@ function monthEnd() {
     n.last = { inc: { ...n.acc.inc }, exp: { ...n.acc.exp } }; n.acc = { inc: {}, exp: {} };
     n.hist.push({ m, t: n.treasury, p: n.pop, a: n.approval, i: sumObj(n.last.inc), e: sumObj(n.last.exp) }); if (n.hist.length > 240) n.hist.shift();
     for (const L of n.loans) L.left--; n.loans = n.loans.filter(L => L.left > 0);
-    if (n.ai) { if (n.trades.length) n.rel = Math.min(100, n.rel + 0.4); n.rel += (50 - n.rel) * 0.01; if (m % 3 === 0) aiExpand(n); }
+    if (n.ai) { if (n.trades.length) n.rel = Math.min(100, n.rel + 0.4); n.rel += (persOf(n).rel - n.rel) * 0.01; if (m % persOf(n).exp === 0) aiExpand(n); }
     else {
       if (n.treasury < 0 && m % 2 === 0 && n.id === S.active) toast('Kas negara defisit!', 'Naikkan pajak, kurangi biaya, atau ambil pinjaman', 'bad', 'alert');
       const age = m - Math.floor(n.founded / 30); if (age > 0 && age % 60 === 0) election(n);
     }
   }
+  govMonthEnd(m);
   const n = act();
   if (n && n.last) { const net = sumObj(n.last.inc) - sumObj(n.last.exp); floatText(n.capital.x + 0.5, 2.2, n.capital.z - 1.5, (net >= 0 ? '+' : '') + money(net), net < 0); if (net > 0) sfx('coin'); }
-  if (m >= 3 && Math.random() < 0.3 && $('#modal').classList.contains('hidden')) randomEvent();
   saveGame(true);
 }
 function election(n) {
-  const share = clamp(n.approval + (Math.random() - 0.5) * 10, 5, 95), win = share >= 47;
+  const share = clamp(n.approval + (Math.random() - 0.5) * 10, 5, 95), win = share >= 47, D = dif();
+  // Career rules: a lost vote can be rescued by a coalition only on easy, or once (normal) when the margin is small.
+  const rescue = !win && (!career() || D.coal >= 99 || (share >= 40 && (n.coalUsed || 0) < D.coal));
+  const lost = !win && !rescue;
   const html = `<p>Rakyat <b>${esc(n.name)}</b> telah memberikan suaranya dalam Pemilihan Umum.</p>
   <div class="grid2" style="margin-top:14px"><div class="box"><div class="lb">Suara untukmu</div><div class="vl ${win ? 'up' : 'dn'}">${share.toFixed(1).replace('.', ',')}%</div></div><div class="box"><div class="lb">Oposisi</div><div class="vl">${(100 - share).toFixed(1).replace('.', ',')}%</div></div></div>
-  <p style="margin-top:14px">${win ? 'Selamat! Kamu terpilih kembali untuk periode 5 tahun berikutnya. Kepercayaan rakyat meningkat.' : 'Kamu kalah tipis — tapi koalisi parlemen menyelamatkan jabatanmu dengan syarat: dana kampanye 10% kas dibayarkan & program reformasi.'}</p>`;
-  if (win) { n.apprMod += 6; } else { n.treasury -= Math.max(0, n.treasury * 0.1); n.approval = 50; }
-  addNews(`Pemilu ${n.name}: ${win ? 'Presiden terpilih kembali' : 'koalisi darurat terbentuk'} (${share.toFixed(1)}%).`);
-  modal({ title: win ? 'Terpilih Kembali!' : 'Hasil Pemilu', sub: `Pemilu ${n.name}`, icon: 'vote', html, buttons: [{ l: 'Lanjutkan', pri: 1 }] });
+  <p style="margin-top:14px">${win ? 'Selamat! Kamu terpilih kembali untuk periode 5 tahun berikutnya. Kepercayaan rakyat meningkat.'
+      : rescue ? `Kamu kalah tipis — tapi koalisi parlemen menyelamatkan jabatanmu dengan syarat: dana kampanye 10% kas dibayarkan & program reformasi.${career() && D.coal < 99 ? ' <b>Koalisi darurat hanya bisa terjadi sekali.</b>' : ''}`
+      : 'Oposisi menang telak. Tidak ada koalisi yang mau menyelamatkanmu.'}</p>`;
+  if (win) { n.apprMod += 6; } else if (rescue) { n.treasury -= Math.max(0, n.treasury * 0.1); n.approval = 50; n.coalUsed = (n.coalUsed || 0) + 1; }
+  addNews(`Pemilu ${n.name}: ${win ? 'Presiden terpilih kembali' : rescue ? 'koalisi darurat terbentuk' : 'oposisi menang'} (${share.toFixed(1)}%).`);
+  queueModal(() => modal({ title: win ? 'Terpilih Kembali!' : 'Hasil Pemilu', sub: `Pemilu ${esc(n.name)}`, icon: 'vote', html, buttons: [{ l: 'Lanjutkan', pri: 1 }] }));
+  if (lost) nationFails(n, 'election');
 }
 
 /* ---------------- AI ---------------- */
@@ -366,6 +377,7 @@ function nationRoads(n) { const r = []; for (const i of S.roadSet) if (owner[i] 
 function aiAct(n) {
   if (n.treasury < 100e3) return;
   const R = Math.random; let type;
+  if (n.treasury > 2e6 && R() < (n.pers === 'agresif' ? 0.22 : 0.16) && aiUpgrade(n)) return;
   if (n.pd > n.ps * 0.9) type = n.pop > 9000 && R() < 0.5 ? 'coal' : R() < 0.5 ? 'wind' : 'solar';
   else if (n.wd > n.ws * 0.9) type = n.pop > 16000 ? 'waterplant' : 'watertower';
   else if (R() < 0.2) { if (!aiRoad(n)) aiExpand(n); return; }
@@ -399,7 +411,7 @@ function aiRoad(n) {
   return false;
 }
 function aiExpand(n) {
-  if (n.tiles > 1600) return;
+  if (n.tiles > persOf(n).cap) return;
   const cand = [];
   for (let z = 0; z < MAP; z++) for (let x = 0; x < MAP; x++) {
     const i = ix(x, z); if (owner[i] !== -1) continue;
@@ -410,26 +422,3 @@ function aiExpand(n) {
   for (const [i] of take) owner[i] = n.id; n.tiles += take.length; if (take.length) S.terrDirty = true;
 }
 
-/* ---------------- events ---------------- */
-const sc = n => Math.max(1, n.pop / 4000);
-const EVENTS = [
-  { t: 'Investor Asing Datang', i: 'brief', d: n => `Konsorsium global menawarkan investasi <b>${money(3e6 * sc(n))}</b> untuk membuka kawasan industri baru di ${esc(n.name)}. Aktivis lingkungan khawatir.`, a: [{ l: 'Terima investasi', f: n => { n.treasury += 3e6 * sc(n); n.apprMod -= 3; return `Kas bertambah ${money(3e6 * sc(n))}.`; } }, { l: 'Tolak, lindungi lingkungan', f: n => { n.apprMod += 4; return 'Rakyat mengapresiasi keputusanmu.'; } }] },
-  { t: 'Banjir Musiman', i: 'drop', d: n => `Hujan deras merendam beberapa permukiman. Warga menunggu respons pemerintah. Dana darurat yang dibutuhkan: <b>${money(n.pop * 120 + 2e5)}</b>.`, a: [{ l: 'Kucurkan dana darurat', f: n => { n.treasury -= n.pop * 120 + 2e5; n.apprMod += 6; return 'Penanganan cepat — approval naik.'; } }, { l: 'Serahkan ke pemerintah daerah', f: n => { n.apprMod -= 9; return 'Warga kecewa dengan lambannya respons.'; } }] },
-  { t: 'Festival Budaya Nasional', i: 'sparkle', d: n => `Seniman mengusulkan festival budaya besar-besaran. Biaya penyelenggaraan <b>${money(5e5 * sc(n))}</b>.`, a: [{ l: 'Selenggarakan!', f: n => { n.treasury -= 5e5 * sc(n); n.apprMod += 6; return 'Festival meriah, rakyat bahagia.'; } }, { l: 'Tunda tahun depan', f: n => { n.apprMod -= 1; return 'Festival ditunda.'; } }] },
-  { t: 'Demo Mahasiswa', i: 'users', d: n => `Ribuan mahasiswa menuntut biaya pendidikan lebih murah. Subsidi akan memakan <b>${money(8e5 * sc(n))}</b>.`, a: [{ l: 'Kabulkan tuntutan', f: n => { n.treasury -= 8e5 * sc(n); n.apprMod += 7; return 'Mahasiswa bubar dengan damai.'; } }, { l: 'Tolak dengan tegas', f: n => { n.apprMod -= 7; return 'Demo meluas ke kota lain.'; } }] },
-  { t: 'Cadangan Emas Ditemukan', i: 'coins', d: n => `Ahli geologi menemukan cadangan emas di pegunungan ${esc(n.name)}. Eksploitasi bisa menghasilkan <b>${money(6e6 * sc(n))}</b>.`, a: [{ l: 'Eksploitasi sekarang', f: n => { n.treasury += 6e6 * sc(n); n.apprMod -= 2; return `Kas bertambah ${money(6e6 * sc(n))}.`; } }, { l: 'Jadikan kawasan konservasi', f: n => { n.apprMod += 4; return 'Alam terjaga, dunia memuji.'; } }] },
-  { t: 'Kunjungan Kenegaraan', i: 'globe', d: n => { const a = S.nations.find(x => x.ai); return `${a ? esc(a.leader) + ' dari ' + esc(a.name) : 'Pemimpin asing'} ingin berkunjung. Jamuan kenegaraan bernilai <b>${money(1e6)}</b>.`; }, a: [{ l: 'Sambut dengan jamuan megah', f: n => { n.treasury -= 1e6; const a = S.nations.find(x => x.ai); if (a) a.rel = Math.min(100, a.rel + 15); return 'Hubungan diplomatik menghangat (+15).'; } }, { l: 'Tolak dengan sopan', f: n => { const a = S.nations.find(x => x.ai); if (a) a.rel -= 8; return 'Hubungan sedikit mendingin.'; } }] },
-  { t: 'Wabah Flu Musiman', i: 'shield', d: n => `Kasus flu meningkat tajam. Vaksinasi massal butuh <b>${money(n.pop * 90 + 1e5)}</b>.`, a: [{ l: 'Vaksinasi massal', f: n => { n.treasury -= n.pop * 90 + 1e5; n.apprMod += 4; return 'Wabah terkendali.'; } }, { l: 'Imbau warga jaga kesehatan', f: n => { n.apprMod -= 8; for (const b of n.list) b.occ *= 0.95; return 'Penduduk berkurang 5%.'; } }] },
-  { t: 'Skandal Menteri', i: 'alert', d: n => `Media mengungkap dugaan korupsi seorang menteri kabinetmu.`, a: [{ l: 'Pecat & proses hukum', f: n => { n.apprMod += 5; return 'Integritas pemerintahan terjaga.'; } }, { l: 'Lindungi menteri', f: n => { n.apprMod -= 9; return 'Kepercayaan publik anjlok.'; } }] },
-  { t: 'Startup Unicorn Lokal', i: 'sparkle', d: n => `Startup teknologi lokal meminta suntikan dana negara <b>${money(2e6 * sc(n))}</b> dengan imbalan saham.`, a: [{ l: 'Investasikan', f: n => { const c = 2e6 * sc(n); n.treasury -= c; if (Math.random() < 0.65) { n.treasury += c * 3; n.apprMod += 3; return `Sukses besar! Kembali ${money(c * 3)}.`; } return 'Startup gagal — dana hilang.'; } }, { l: 'Biarkan pasar bekerja', f: n => 'Tidak ada perubahan.' }] },
-  { t: 'Lonjakan Harga Komoditas', i: 'chart', d: n => `Harga komoditas ekspor naik di pasar dunia. Kas negara mendapat bonus <b>${money(1.5e6 * sc(n))}</b>.`, a: [{ l: 'Masukkan ke kas negara', f: n => { n.treasury += 1.5e6 * sc(n); return 'Kas bertambah.'; } }, { l: 'Bagikan sebagai bansos', f: n => { n.apprMod += 8; return 'Rakyat bersuka cita.'; } }] },
-];
-function randomEvent() {
-  const n = act(); if (!n || n.ai) return;
-  const evs = EVENTS.filter(e => S.unl.diplo || e.t !== 'Kunjungan Kenegaraan'), e = evs[Math.floor(Math.random() * evs.length)];
-  S.paused = true; renderTime();
-  modal({
-    title: e.t, sub: `Laporan untuk Presiden · ${esc(n.name)}`, icon: e.i, html: `<p>${e.d(n)}</p>`, noClose: 1,
-    choices: e.a.map(a => ({ l: a.l, f: () => { const r = a.f(n); toast(e.t, r, 'info', 'info'); addNews(`${e.t}: ${a.l}.`); S.paused = false; renderTime(); } }))
-  });
-}

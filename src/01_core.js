@@ -117,6 +117,7 @@ const CATS = [
   { id: 'rec', name: 'Taman & Rekreasi', icon: 'tree', key: '7' },
   { id: 'gov', name: 'Pemerintahan & Strategis', icon: 'gov', key: '8' },
   { id: 'lm', name: 'Landmark Nasional', icon: 'star', key: '9' },
+  { id: 'zone', name: 'Zonasi · swasta membangun', icon: 'zone', key: 'Z' },
   { sep: 1 },
   { id: 'land', name: 'Wilayah & Negara Baru', icon: 'map', key: 'L' },
   { id: 'bulldoze', name: 'Buldoser', icon: 'trash', key: 'B' },
@@ -154,7 +155,7 @@ const BT = {
   palace: { n: 'Istana Presiden', c: 'gov', cost: 0, s: 3, uniq: 1, nobuild: 1, r: 10, hap: 0.06, jobs: 320, pw: 8, wt: 4, up: 1000, days: 1, desc: 'Kantor & kediaman Presiden.' },
   parliament: { n: 'Gedung Parlemen', c: 'gov', cost: 8e6, s: 3, uniq: 1, appr: 5, jobs: 600, pw: 12, wt: 6, up: 3000, days: 12, unlock: 8000, desc: 'Approval presiden +5.' },
   port: { n: 'Pelabuhan', c: 'gov', cost: 6e6, s: 2, needs: 'coast', trade: 260e3, jobs: 880, pw: 14, wt: 6, up: 2500, days: 10, unlock: 10000, desc: 'Gerbang perdagangan laut.' },
-  military: { n: 'Pangkalan Militer', c: 'gov', cost: 9e6, s: 3, appr: 2, jobs: 1600, pw: 20, wt: 12, up: 6000, days: 12, unlock: 20000, desc: 'Pertahanan & wibawa negara.' },
+  military: { n: 'Pangkalan Militer', c: 'gov', cost: 9e6, s: 3, appr: 2, jobs: 1600, pw: 20, wt: 12, up: 6000, days: 12, unlock: 20000, desc: 'Approval +2 · negara agresif segan menuntut wilayahmu.' },
   airport: { n: 'Bandara Internasional', c: 'gov', cost: 22e6, s: 4, uniq: 1, trade: 300e3, tourm: 1.5, jobs: 3600, pw: 60, wt: 20, up: 9000, days: 20, unlock: 48000, desc: 'Wisata ×1,5 + perdagangan.' },
   monument: { n: 'Monumen Nasional', c: 'lm', cost: 15e6, s: 2, uniq: 1, r: 22, hap: 0.08, tour: 220e3, up: 1200, days: 14, unlock: 12000, desc: 'Ikon kebanggaan bangsa.' },
   opera: { n: 'Gedung Opera', c: 'lm', cost: 24e6, s: 2, uniq: 1, r: 22, hap: 0.08, tour: 320e3, jobs: 320, pw: 10, wt: 4, up: 2400, days: 16, unlock: 32000, desc: 'Mahakarya arsitektur.' },
@@ -171,6 +172,13 @@ const POL = {
   tour: { n: 'Promosi Pariwisata', d: 'Pendapatan wisata +40%', cost: n => 150000 },
   sez: { n: 'Zona Ekonomi Khusus', d: 'Pendapatan bisnis +20%, kebahagiaan −3%', cost: n => 0 },
   housing: { n: 'Program Rumah Rakyat', d: 'Kapasitas semua hunian +15%', cost: n => n.pop * 0.9 },
+  transit: { n: 'Transportasi Umum', d: 'Kapasitas jalan 2× — kemacetan turun', cost: n => n.pop * 0.7 + 30000 },
+  autoup: { n: 'Peremajaan Kota Otomatis', d: 'Bangunan yang penuh & bahagia ditingkatkan otomatis (biaya normal, kas cadangan dijaga)', cost: n => 25000 },
+  bnpb: { n: 'Badan Penanggulangan Bencana', d: 'Kerusakan bencana −50%, pemulihan 2× lebih cepat', cost: n => n.pop * 0.4 + 40000 },
+  progtax: { n: 'Pajak Progresif', d: 'Pajak warga +15%, tapi approval −3', cost: n => 0 },
+  privat: { n: 'Privatisasi Utilitas', d: 'Biaya perawatan −20%, tapi kebahagiaan −5%', cost: n => 0 },
+  fuel: { n: 'Subsidi BBM', d: 'Approval +6 — makin mahal seiring jumlah penduduk', cost: n => n.pop * 2.4 + 50000 },
+  conscript: { n: 'Wajib Militer', d: 'Negara agresif segan menuntut wilayah, tapi approval −4', cost: n => n.pop * 0.3 + 20000 },
 };
 const MILESTONES = [[2000, 2e6], [5000, 4e6], [10000, 8e6], [25000, 15e6], [50000, 30e6], [100000, 60e6], [250000, 120e6], [500000, 250e6], [1e6, 500e6]];
 const AI_DEFS = [
@@ -185,9 +193,11 @@ const S = {
   nations: [], active: 0, blds: new Map(), nextId: 1,
   tool: { mode: 'select', type: null, rot: 0 }, political: false, showGrid: true, dayNight: true, sfx: true,
   cleared: new Set(), roadSet: new Set(), news: [], mis: [], cnt: { road: 0, land: 0, up: 0, trade: 0, b: {} }, unl: { diplo: false, found: false }, overlay: null, trackOpen: true, terrDirty: true, selected: null, drawer: null, cycle: 0.32,
+  diff: 'normal', mode: 'career', over: null, won: null, ended: null, music: true, disasters: true, gfx: 'high',
+  evq: [], evRecent: [], mq: [], st: { months: 0, apprSum: 0, peak: 0, greenM: 0, relSum: 0 }, dmgSet: new Set(), zoneDirty: true, dmgDirty: false,
 };
 const W = { uTime: { value: 0 }, treeAt: new Map(), treeMesh: [], noise: null };
-let terr, elev, owner, road, tileB, H;
+let terr, elev, owner, road, tileB, H, zone;
 
 /* ---------------- three setup ---------------- */
 const canvas = $('#c');
@@ -252,7 +262,7 @@ function genTerrain(seed) {
   const gm = []; for (let i = 0; i < MAP * MAP; i++) if (terr[i] === T.GRASS) gm.push(moist[i]); gm.sort((a, b) => a - b);
   const ft = gm[Math.floor(gm.length * 0.64)] ?? 1;
   for (let i = 0; i < MAP * MAP; i++) if (terr[i] === T.GRASS && moist[i] > ft) terr[i] = T.FOREST;
-  owner = new Int8Array(MAP * MAP).fill(-1); road = new Uint8Array(MAP * MAP); tileB = new Int32Array(MAP * MAP);
+  owner = new Int8Array(MAP * MAP).fill(-1); road = new Uint8Array(MAP * MAP); tileB = new Int32Array(MAP * MAP); zone = new Uint8Array(MAP * MAP);
 }
 function buildHeights() {
   const V = MAP + 1; H = new Float32Array(V * V); const R = mulberry32(S.seed + 77);

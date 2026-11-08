@@ -1,7 +1,7 @@
-# SOVEREIGN — Handoff (v0.2 prototype)
+# SOVEREIGN — Handoff (v0.3 prototype)
 
 > 3D nation builder. The player is president: starts with land, money and basic facilities, builds roads and buildings, grows a country, then unlocks diplomacy and founds up to 5 nations.
-> Status: **playable prototype, approved for deployment.** It is pure client side, with no backend yet.
+> Status: **playable prototype.** It is pure client side, with no backend yet. v0.3 adds win/lose conditions, difficulty, competitive AI, lasting events, zoning, traffic, land value, disasters, music, graphics settings and save export/import (see §3.7–3.8).
 
 ---
 
@@ -9,11 +9,11 @@
 
 | | |
 |---|---|
-| Output | `dist/index.html`, a single self-contained file (~243 KB) |
+| Output | `dist/index.html`, a single self-contained file (~315 KB) |
 | Runtime deps | **Three.js r160** (ESM from `cdn.jsdelivr.net`) + Google Fonts (Unbounded, Manrope). Nothing else. |
 | Build | `node build.mjs` (Node ≥ 18, no npm install needed). It concatenates `src/` → `dist/index.html` |
 | Deploy now | Static hosting. Nginx on the Hostinger VPS (config in `deploy/`) or Vercel (`vercel.json`). GitHub Actions (`.github/workflows/deploy.yml`) builds, smoke-tests and deploys on push; setup in README |
-| Save system | `localStorage` key `sovereign_save_v1` (autosave every in-game month) |
+| Save system | `localStorage` key `sovereign_save_v1` (autosave every in-game month; format v2, v1 saves still load). Export/import as `.json` from Settings or the title screen |
 | Debug API | Open with `?debug` → `window.__game` exposes state + helpers |
 
 ```bash
@@ -36,9 +36,11 @@ Functions are hoisted, and every cross-file call happens only after `init()` run
 | `src/00_shell.html` | `<head>`, all CSS (design tokens in `:root`), static DOM skeleton (HUD containers, modal, title, loading) |
 | `src/01_core.js` | Constants, seeded RNG + Perlin noise, formatting (`money`, `fmt`, Indonesian units rb/jt/M/T), SVG icon set `I`, **building catalogue `BT`**, policies `POL`, milestones, AI nation defs, global state `S`, Three.js renderer/scene/lights/sky, terrain generation, heightfield + terrain mesh, water shader, instanced trees, territory overlay |
 | `src/02_geometry.js` | `GB`, the procedural geometry builder (boxes/gables/lathes → one merged BufferGeometry with vertex colors; lit windows go to a separate geometry). `GEO.<type>(g, level, variant, nationColor)` for all 37 building types, road/bridge geometry per neighbour mask, rotor, car. **Instancing `Pool`** class |
-| `src/03_simulation.js` | Placement rules, buildings, roads, cars, particles (smoke/steam/dust), nations, starter cities, daily simulation, month end, elections, AI behaviour, random events |
+| `src/03_simulation.js` | Placement rules, buildings, roads, cars, particles (smoke/steam/dust), nations, starter cities, daily simulation (applies `natMods`, land value, congestion), month end, elections, AI behaviour |
 | `src/04_ui.js` | Audio blips, toasts, modal system, HUD, toolbar, build drawer, info panel, overlays (ghost/cursor/range ring), input (mouse/touch/keyboard), minimap, dialogs (nations, transfer, diplomacy, policy, stats, settings, found nation) |
 | `src/05_progression.js` | **Program Kerja** (26 missions / 4 chapters), unlock gating, RCI demand meter, data views (heatmaps + building tint), problem marker sprites |
+| `src/05b_governance.js` | Difficulty `DIFF` & modes, modal queue (`queueModal`/`decide`), timed effects (`addMod`/`natMods`), public demand, fiscal crisis/IMF, impeachment, game over & secession, victory/term end/score/style title, world ranking, AI personalities & upgrades & AI-initiated diplomacy, `EVENTS` (with follow-ups), monthly/daily drivers `govMonthEnd`/`govDay` |
+| `src/05c_city.js` | Zoning (`ZONES`, `zoneDev`, overlay), auto-upgrade, land value, disasters + repair, procedural music, graphics quality `GFX`, save export/import, status chips, approval breakdown |
 | `src/06_main.js` | Camera rig, day/night, shadows, clouds, labels, save/load, new game, title screen, runtime thumbnail rendering, main loop, `init()` |
 
 ---
@@ -82,17 +84,36 @@ Functions are hoisted, and every cross-file call happens only after `init()` run
 
 ### 3.5 Multi-nation & AI
 - 3 AI nations, spawned ≥ 46–58 tiles from the player. They use the same simulation as the player.
-- `aiAct` runs every 2 days and builds by need (power, water, jobs vs housing). `aiRoad` extends a 4-tile grid. `aiExpand` claims land every 3 months (cap 1,600 tiles).
-- Diplomacy: trade agreement (income = √(popA·popB)·9 per month), aid (+relation), alliance (relation ≥ 75), buy border land (relation ≥ 50).
+- `aiAct` runs every 2 days and builds by need (power, water, jobs vs housing), and sometimes upgrades a building (`aiUpgrade`). `aiRoad` extends a 4-tile grid. `aiExpand` claims land on a personality-dependent cadence and cap.
+- Personalities (`PERS`): **Agresif** (cap 2,200 tiles, relation drifts to 35, makes territorial demands, friction on shared borders), **Pedagang** (offers trade deals), **Damai** (relation drifts to 62, offers alliances).
+- Diplomacy: trade agreement (income = √(popA·popB)·9 per month), aid (+relation), alliance (relation ≥ 75), buy border land (relation ≥ 50). AI-initiated (`aiDiplomacy`, monthly): tariffs when relation < 30 and trading (business −8%, industry −15%, 12 months), sanctions when < 22 (tourism −25%, trade −15%), territorial demands, aid requests, trade and alliance offers. Military Base or the Conscription policy deters demands. "Negosiasi damai" ($2 jt) lifts tariffs/sanctions.
 - Player nations: up to 5, each with its own treasury, tax, policies, loans and approval. Funds can be transferred between them. The active nation is `S.active`.
 
-### 3.6 Save format (`localStorage['sovereign_save_v1']`)
+### 3.6 Save format (`localStorage['sovereign_save_v1']`, v2)
 ```
-{ v, seed, president, day, active, cycle, owner: RLE[int8], roads:[tileIdx], cleared:[tileIdx],
-  nations:[{id,name,color,flag2,fstyle,ai,leader,treasury,tax,capital,approval,apprMod,tiles,hist,pol,loans,ms,trades,allied,rel,radius,founded,acc,last,rate}],
-  blds:[[type,x,z,rot,nid,level,variant,occ,prog,happy]], news, opts, mis, cnt, unl }
+{ v: 2, seed, president, day, active, cycle, owner: RLE[int8], roads:[tileIdx], cleared:[tileIdx],
+  diff, mode, over, won, ended, zones: RLE[uint8], evq:[{id,nid,day}], evRecent, st:{months,apprSum,peak,greenM,relSum},
+  nations:[{id,name,color,flag2,fstyle,ai,leader,treasury,tax,capital,approval,apprMod,tiles,hist,pol,loans,ms,trades,allied,rel,radius,founded,acc,last,rate,
+            popM,dem,debtM,lowM,coalUsed,mods,pers,sanc,imfDay,sec,stake}],
+  blds:[[type,x,z,rot,nid,level,variant,occ,prog,happy,dmg]], news, opts, mis, cnt, unl }
 ```
-The terrain is regenerated from `seed`, so only deltas are stored. A typical save is 20–80 KB.
+The terrain is regenerated from `seed`, so only deltas are stored. A typical save is 20–80 KB. v1 saves load as Career · Normal and show a "what's new" dialog once.
+
+### 3.7 Challenge & governance (v0.3)
+- **Modes**: Karier (win/lose) or Bebas (sandbox, no game over). **Difficulty** `DIFF`: Mudah / Normal / Sulit (start funds, player upkeep, demand rate & cap, impeachment threshold, months to bankruptcy, coalition rescues, disaster frequency, AI aggression, victory population, score multiplier).
+- **Tuntutan rakyat** (`n.dem`): grows every month (rate shrinks as the nation approaches the victory population), relieved by growth above the best population so far (1%/month = −3), missions (−3), chapters (−8), landmarks (−6), milestones (−10). It is subtracted from the approval target.
+- **Lose**: bankrupt (treasury < 0 for `crisis` consecutive months; IMF bailout offered halfway, once per 5 years), impeachment (approval < `appLo` for 6 months; protest event at 2 months), lost election (coalition rescue: always on easy, once with ≥ 40% on normal, never on hard). A secondary player nation that fails breaks away and becomes AI instead of ending the game.
+- **Win**: Negara Adidaya = all 26 missions + total player population ≥ `vic` + GDP rank #1 + approval ≥ 55%. **Term end** after 240 months. Both show a legacy screen (style title from `styleOf`, score from `scoreOf`) and continue in sandbox.
+- **Timed effects** (`n.mods`): multiplicative on tax/com/ind/tour/trade/upk, additive on hap/appr. Used by events, IMF, tariffs and sanctions. 7 trade-off policies added to `POL` (transit, autoup, bnpb, progtax, privat, fuel, conscript).
+- **Events**: 24 entries in `EVENTS`, no repeats within the last 6, follow-ups via `queueEvent` (e.g. investor → waste scandal, protest → escalation, startup → result 6 months later, sports bid → games a year later).
+
+### 3.8 City dynamics (v0.3)
+- **Zoning** (tool Z): paint R/C/I zones ($250/tile). Every 3 days private developers build on zoned, road-connected tiles when RCI demand ≥ 0.3; the state pays 50% (`DEV_SHARE`). Industry needs 2×2 zoned blocks. Bulldozing clears zones.
+- **Auto-upgrade** (policy *Peremajaan Kota Otomatis*): monthly, up to 6 qualifying buildings (homes ≥ 90% full, happy ≥ 65%, land value ≥ 0.45; business/industry when unemployment ≥ 3%) while keeping a cash reserve.
+- **Land value** (`b.lval`, homes): services, parks, landmarks, water view, minus pollution. Tax multiplier 0.7 + 0.5·lval. Data view "Nilai tanah".
+- **Traffic** (`n.cong` = employed / (roads·220, ×2 with *Transportasi Umum*)): above 100% lowers happiness (up to −15%) and business revenue (up to −30%). HUD stat "Macet".
+- **Disasters** (from month 6, ~5.5%/month × difficulty): fire (fire-station coverage matters), earthquake, coastal flood, storm. Damaged buildings stop working, smoke and turn dark, recover automatically or can be repaired (30% of cost). BNPB policy halves damage and doubles recovery speed.
+- **Music**: generative WebAudio ambient, switches to a minor progression during crises. **Graphics**: Tinggi/Sedang/Rendah (pixel ratio, shadow map size/off), auto-defaults lower on phones; stored per device in `localStorage['sovereign_gfx']`.
 
 ---
 
@@ -109,22 +130,29 @@ The terrain is regenerated from `seed`, so only deltas are stored. A typical sav
 | Found nation | `FOUND_COST / FOUND_SEED` | $15 jt cost, $10 jt seed |
 | Feature gates | `UNL` | diplo 5k, found 25k |
 | Missions & rewards | `MISSIONS`, `CH_BONUS` | 26 missions |
+| Difficulty | `DIFF` (`05b_governance.js`) | see §3.7 |
+| Term length | `TERM_MONTHS` | 240 months |
+| AI personalities | `PERS` | tile cap, expansion cadence, relation drift |
+| Events | `EVENTS` | 24, 30% chance per month |
+| Zoning | `ZONE_FEE`, `DEV_SHARE` | $250/tile, state pays 50% |
+| Disasters | `disasterRoll()` | 5.5%/month × `DIFF.dis` |
 
 ---
 
 ## 5. Controls
-Left-click: build / select · Right-drag: pan · Middle-drag or Alt+drag: rotate/tilt · Wheel: zoom to cursor · WASD/arrows: pan · Q/E: rotate · R: rotate building · Esc / right-click: cancel tool · Tab: political map · Space: pause · 1–9, B, L, V: tool categories. Touch: 1 finger pans or uses the tool, 2 fingers pinch-zoom and rotate.
+Left-click: build / select · Right-drag: pan · Middle-drag or Alt+drag: rotate/tilt · Wheel: zoom to cursor · WASD/arrows: pan · Q/E: rotate · R: rotate building · Esc / right-click: cancel tool · Tab: political map · Space: pause · 1–9, Z, B, L, V: tool categories (Z = zoning). Touch: 1 finger pans or uses the tool, 2 fingers pinch-zoom and rotate.
 
 ---
 
 ## 6. Known limitations / tech debt
 1. **Single module, globals everywhere.** Fine for a prototype. For production, split into TS modules (see roadmap).
 2. Saves exist only in `localStorage` (per browser). There are no accounts or cloud saves.
-3. Performance targets desktop GPUs: 2048 shadow map, ~5–8k tree instances, up to a few thousand building instances. There is no LOD or chunking yet. Recommended: lower the shadow map to 1024 and halve the trees on mobile/low-end devices (detect via `renderer.capabilities` or the UA).
+3. Performance targets desktop GPUs. v0.3 adds a graphics setting (shadow map 2048/1024/off, pixel ratio 2/1.5/1) with a lower default on phones, but there is still no LOD, chunking or tree thinning.
 4. The simulation runs on the main thread (cheap today: < 2 ms/day). Move it to a Web Worker if maps grow.
 5. Construction progresses in real time on the render loop. In background tabs, rAF pauses and so does the game. This is intentional.
-6. AI is heuristic (no long-term planning). AI nations do not upgrade buildings.
-7. No traffic simulation, disasters, land value or auto-levelling yet.
+6. AI is heuristic (no long-term planning), although it now upgrades buildings and reacts diplomatically.
+7. Traffic is a nation-level congestion ratio, not per-road pathfinding. Cars are visual only.
+9. Late-game cash still piles up for an efficient player (a scripted builder reached $200–300 jt by year 10). The new pressures are approval/demand, elections, AI and disasters rather than money; tune `MILESTONES`/mission rewards if money should stay tight.
 8. Three.js and fonts come from CDNs. Vendor `three.module.js` locally if the CDN is a concern (change the single import at the top of `01_core.js`).
 
 ---
@@ -157,3 +185,8 @@ Left-click: build / select · Right-drag: pan · Middle-drag or Alt+drag: rotate
 - [x] Save → reload → Continue restores nations, buildings, roads and territory
 - [x] Day/night lighting, political map, minimap navigation
 - [x] Desktop 1280–1920 and phone 390 px (no horizontal scroll)
+- [x] v0.3: idle player loses on Sulit at the first election (4/4 runs), drifts to 40–50% approval on Normal, survives on Mudah; a scripted active builder keeps ~70% approval on Normal and Sulit
+- [x] v0.3: fiscal crisis → IMF offer → bankruptcy → continue in sandbox; impeachment; secession of a 2nd nation; victory; term end
+- [x] v0.3: AI tariffs/sanctions/territorial demands/peace; all 24 events × all choices; follow-up events fire
+- [x] v0.3: all 4 disasters, repair all, automatic recovery; zoning builds houses/shops; auto-upgrade; transit halves congestion; land-value view
+- [x] v0.3: v1 save loads and re-saves as v2; v2 save round-trips; export → import on a fresh browser; music and graphics toggles
