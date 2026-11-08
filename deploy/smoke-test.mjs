@@ -46,20 +46,27 @@ if (process.env.SMOKE_THREE_FILE) {
   await page.route(THREE_URL, r => r.fulfill({ status: 200, contentType: 'text/javascript', body }));
 }
 
+const t0 = Date.now();
+const step = msg => console.log(`[${((Date.now() - t0) / 1000).toFixed(1)}s] ${msg}`);
 try {
-  console.log(`Loading ${url}`);
-  await page.goto(url, { waitUntil: 'load', timeout: 60_000 });
+  step(`loading ${url}`);
+  await page.goto(url, { waitUntil: 'load', timeout: 120_000 });
   const title = await page.title();
   if (!title.includes('SOVEREIGN')) problems.push(`unexpected page title: "${title}"`);
-  await page.locator('#tStart').click({ timeout: 60_000 });          // "Mulai Memerintah"
-  await page.getByText('Selamat bertugas').waitFor({ timeout: 30_000 });
-  await page.waitForTimeout(5_000);                                   // let a few in-game days run
+  step('page loaded, waiting for the title screen');
+  // software WebGL on CI machines is slow: startup renders every build-menu thumbnail
+  await page.locator('#tStart').click({ timeout: 180_000 });         // "Mulai Memerintah"
+  step('clicked "Mulai Memerintah"');
+  await page.getByText('Selamat bertugas').waitFor({ timeout: 60_000 });
+  step('welcome dialog shown, letting a few in-game days run');
+  await page.waitForTimeout(5_000);
   const canvas = await page.locator('canvas').first().boundingBox();
   if (!canvas || canvas.width < 100) problems.push('game canvas is missing');
 } catch (e) {
   problems.push(e.message.split('\n')[0]);
 } finally {
-  await page.screenshot({ path: 'smoke-test.png' }).catch(() => {});
+  await page.screenshot({ path: 'smoke-test.png', timeout: 60_000 })
+    .catch(e => console.warn(`screenshot failed: ${e.message.split('\n')[0]}`));
   await browser.close();
   server?.close();
 }
