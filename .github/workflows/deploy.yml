@@ -1,0 +1,168 @@
+# Build + headless test on every push. On the default branch it also deploys
+# dist/ to the VPS (rsync via deploy/deploy.sh), sets up Nginx + HTTPS on the
+# first run (deploy/server-setup.sh) and checks the live site.
+#
+# Deploy needs, under Settings → Secrets and variables → Actions:
+#   secrets   VPS_HOST, VPS_USER, VPS_SSH_KEY (private key)   optional: VPS_PORT, VPS_KNOWN_HOSTS
+#   variable  DOMAIN (e.g. sovereign.example.com)              optional: CERTBOT_EMAIL
+# Until they are set, the deploy job is skipped with a warning.
+name: Build, test & deploy
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sovereign-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PLAYWRIGHT_VERSION: 1.63.0
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build
+        run: node build.mjs
+
+      - name: Committed dist/ matches src/
+        run: |
+          git diff --exit-code --stat -- dist/ \
+            || { echo "::error::dist/index.html is out of date. Run 'node build.mjs' and commit dist/."; exit 1; }
+
+      - name: Install headless browser
+        run: |
+          npm install --no-save --no-package-lock "playwright@$PLAYWRIGHT_VERSION"
+          npx playwright install --with-deps chromium
+
+      - name: Smoke test (local build)
+        run: node deploy/smoke-test.mjs dist
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-test-local
+          path: smoke-test.png
+          if-no-files-found: ignore
+
+  deploy:
+    needs: test
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    env:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+      VPS_PORT: ${{ secrets.VPS_PORT }}
+      DOMAIN: ${{ vars.DOMAIN || secrets.DOMAIN }}
+      CERTBOT_EMAIL: ${{ vars.CERTBOT_EMAIL || secrets.CERTBOT_EMAIL }}
+    steps:
+      - name: Check deploy settings
+        id: cfg
+        env:
+          HAS_KEY: ${{ secrets.VPS_SSH_KEY != '' }}
+        run: |
+          missing=()
+          for v in VPS_HOST VPS_USER DOMAIN; do [ -n "${!v}" ] || missing+=("$v"); done
+          [ "$HAS_KEY" = true ] || missing+=(VPS_SSH_KEY)
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::warning title=Deploy skipped::Not set yet: ${missing[*]}. Add them under Settings → Secrets and variables → Actions (see README)."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          [[ "$DOMAIN" =~ ^([A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?\.)+[A-Za-z]{2,}$ ]] \
+            || { echo "::error::DOMAIN must be a plain host name such as sovereign.example.com (no https://, no slash)"; exit 1; }
+          [[ -z "$CERTBOT_EMAIL" || "$CERTBOT_EMAIL" =~ ^[^[:space:]\'\"]+@[^[:space:]\'\"]+$ ]] \
+            || { echo "::error::CERTBOT_EMAIL is not a valid email address"; exit 1; }
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        if: steps.cfg.outputs.enabled == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.cfg.outputs.enabled == 'true'
+        with:
+          node-version: 20
+
+      - name: Connect to the VPS
+        if: steps.cfg.outputs.enabled == 'true'
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          port="${VPS_PORT:-22}"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          if [ -n "$VPS_KNOWN_HOSTS" ]; then
+            printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          else
+            ssh-keyscan -p "$port" "$VPS_HOST" > ~/.ssh/known_hosts 2>/dev/null || true
+          fi
+          [ -s ~/.ssh/known_hosts ] || { echo "::error::Cannot reach the VPS over SSH (check VPS_HOST / VPS_PORT and the firewall)"; exit 1; }
+          cat > ~/.ssh/config <<EOF
+          Host vps
+            HostName $VPS_HOST
+            User $VPS_USER
+            Port $port
+            IdentityFile ~/.ssh/deploy_key
+            IdentitiesOnly yes
+            StrictHostKeyChecking yes
+            ServerAliveInterval 30
+          EOF
+          ssh vps 'echo "Connected as $(whoami)"
+            command -v rsync >/dev/null || { echo "::error::rsync is not installed on the VPS (apt install rsync)"; exit 1; }
+            [ "$(id -u)" -eq 0 ] || sudo -n true 2>/dev/null || { echo "::error::$(whoami) needs passwordless sudo on the VPS, or use root"; exit 1; }'
+
+      - name: Upload dist/ (deploy/deploy.sh)
+        if: steps.cfg.outputs.enabled == 'true'
+        run: ./deploy/deploy.sh vps
+
+      - name: Nginx site + HTTPS (first deploy only)
+        if: steps.cfg.outputs.enabled == 'true'
+        run: |
+          rsync -a deploy/server-setup.sh deploy/nginx.conf.example vps:.sovereign-setup/
+          ssh vps "bash .sovereign-setup/server-setup.sh $(printf %q "$DOMAIN") $(printf %q "$CERTBOT_EMAIL"); rc=\$?; rm -rf .sovereign-setup; exit \$rc"
+
+      - name: Verify live site
+        if: steps.cfg.outputs.enabled == 'true'
+        run: |
+          fail() { echo "::error::$*"; exit 1; }
+          url="https://$DOMAIN/"
+          head="$(curl -sSI --retry 3 --retry-all-errors "$url")" || fail "cannot reach $url"
+          echo "$head"
+          [[ "$(head -1 <<<"$head")" == *" 200"* ]] || fail "$url did not return 200"
+          grep -qi '^content-type: text/html' <<<"$head" || fail "content-type is not text/html"
+          grep -qi '^cache-control: no-cache' <<<"$head" || fail "cache-control: no-cache is missing"
+          redirect="$(curl -sS -o /dev/null -w '%{http_code} %{redirect_url}' "http://$DOMAIN/")"
+          echo "http:// -> $redirect"
+          [[ "$redirect" =~ ^30[18]\ https:// ]] || fail "HTTP does not redirect to HTTPS ($redirect)"
+          body="$(curl -sS "$url")"
+          grep -q 'SOVEREIGN' <<<"$body" || fail "page does not contain SOVEREIGN"
+          grep -q 'cdn.jsdelivr.net/npm/three@0.160.0' <<<"$body" || fail "page does not import three@0.160.0"
+          echo "Live: $url"
+
+      - name: Install headless browser
+        if: steps.cfg.outputs.enabled == 'true'
+        run: |
+          npm install --no-save --no-package-lock "playwright@$PLAYWRIGHT_VERSION"
+          npx playwright install --with-deps chromium
+
+      - name: Smoke test (live site)
+        if: steps.cfg.outputs.enabled == 'true'
+        run: node deploy/smoke-test.mjs "https://$DOMAIN/"
+
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.cfg.outputs.enabled == 'true'
+        with:
+          name: smoke-test-live
+          path: smoke-test.png
+          if-no-files-found: ignore

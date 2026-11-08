@@ -13,6 +13,7 @@ id_rsa*
 id_ed25519*
 
 # logs & tooling
+smoke-test.png
 *.log
 npm-debug.log*
 .vercel/

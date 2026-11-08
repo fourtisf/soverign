@@ -12,7 +12,7 @@
 | Output | `dist/index.html`, a single self-contained file (~243 KB) |
 | Runtime deps | **Three.js r160** (ESM from `cdn.jsdelivr.net`) + Google Fonts (Unbounded, Manrope). Nothing else. |
 | Build | `node build.mjs` (Node ≥ 18, no npm install needed). It concatenates `src/` → `dist/index.html` |
-| Deploy now | Static hosting. Nginx on the Hostinger VPS (config in `deploy/`) or Vercel (`vercel.json`) |
+| Deploy now | Static hosting. Nginx on the Hostinger VPS (config in `deploy/`) or Vercel (`vercel.json`). GitHub Actions (`.github/workflows/deploy.yml`) builds, smoke-tests and deploys on push; setup in README |
 | Save system | `localStorage` key `sovereign_save_v1` (autosave every in-game month) |
 | Debug API | Open with `?debug` → `window.__game` exposes state + helpers |
 
