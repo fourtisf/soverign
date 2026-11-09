@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# One-time server setup for SOVEREIGN on an Ubuntu + Nginx VPS:
+# One-time server setup for Cityhood on an Ubuntu + Nginx VPS:
 # installs the Nginx site for <domain> from nginx.conf.example and issues HTTPS
-# with certbot. You can run it again: once the site and certificate exist it
+# with certbot (also for www.<domain> when it points to the same server).
+# You can run it again: once the site and certificate exist it
 # changes nothing. It never edits other sites, and it stops with an explanation
 # if the server is not set up as expected.
 #
@@ -23,6 +24,13 @@ stop() { echo "STOP: $*" >&2; exit 1; }
 [[ "$DOMAIN" =~ ^([A-Za-z0-9]([A-Za-z0-9-]*[A-Za-z0-9])?\.)+[A-Za-z]{2,}$ ]] || stop "invalid domain: $DOMAIN"
 DOMAIN_RE="${DOMAIN//./\\.}"
 SERVES_DOMAIN="^[[:space:]]*server_name[^;]*[[:space:]]${DOMAIN_RE}([[:space:];]|$)"
+
+# Serve www.<domain> too when its DNS points to the same address as <domain>.
+NAMES="$DOMAIN"; CERT=(-d "$DOMAIN")
+ip4() { getent ahostsv4 "$1" 2>/dev/null | awk 'NR==1{print $1}'; }
+if [[ "$DOMAIN" != www.* ]] && [ -n "$(ip4 "www.$DOMAIN")" ] && [ "$(ip4 "www.$DOMAIN")" = "$(ip4 "$DOMAIN")" ]; then
+  NAMES="$DOMAIN www.$DOMAIN"; CERT+=(-d "www.$DOMAIN")
+fi
 
 SUDO=()
 if [ "$(id -u)" -ne 0 ]; then
@@ -51,7 +59,7 @@ else
   [ ! -e "$ENABLED" ] || stop "$ENABLED exists but $AVAIL does not"
   "${SUDO[@]}" nginx -t 2>/dev/null || stop "the current Nginx config is already invalid (nginx -t); not touching it"
   tmp="$(mktemp)"
-  sed "s/<DOMAIN>/$DOMAIN/g" "$TEMPLATE" > "$tmp"
+  sed "s/<DOMAIN>/$NAMES/g" "$TEMPLATE" > "$tmp"
   "${SUDO[@]}" install -m 644 "$tmp" "$AVAIL"
   rm -f "$tmp"
   "${SUDO[@]}" ln -s "$AVAIL" "$ENABLED"
@@ -60,7 +68,7 @@ else
     stop "nginx -t failed with the new site, so it was removed again and Nginx was not reloaded"
   fi
   "${SUDO[@]}" systemctl reload nginx
-  echo "Installed and enabled Nginx site: $AVAIL"
+  echo "Installed and enabled Nginx site: $AVAIL ($NAMES)"
 fi
 
 # --- HTTPS -------------------------------------------------------------------
@@ -69,7 +77,7 @@ if "${SUDO[@]}" grep -q ssl_certificate "$AVAIL"; then
 else
   command -v certbot >/dev/null || stop "certbot is not installed (apt install certbot python3-certbot-nginx)"
   if [ -n "$EMAIL" ]; then reg=(-m "$EMAIL"); else reg=(--register-unsafely-without-email); fi
-  "${SUDO[@]}" certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos --redirect "${reg[@]}" \
+  "${SUDO[@]}" certbot --nginx "${CERT[@]}" --non-interactive --agree-tos --redirect "${reg[@]}" \
     || stop "certbot failed. Check that the DNS A record for $DOMAIN points to this server ($(hostname -I | awk '{print $1}'))"
-  echo "HTTPS issued for $DOMAIN (HTTP now redirects to HTTPS)"
+  echo "HTTPS issued for $NAMES (HTTP now redirects to HTTPS)"
 fi

@@ -1,7 +1,7 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 
 /* =====================================================================
-   SOVEREIGN — Nation Builder  ·  single-file prototype
+   CITYHOOD — City & Nation Builder  ·  single-file prototype
    ===================================================================== */
 const MAP = 160, HALF = MAP / 2, DAY_SEC = 0.8, SAVE_KEY = 'sovereign_save_v1', MAX_PLAYER_NATIONS = 5;
 const T = { DEEP: 0, SHALLOW: 1, SAND: 2, GRASS: 3, FOREST: 4, HILL: 5, MTN: 6 };

@@ -52,7 +52,7 @@ try {
   step(`loading ${url}`);
   await page.goto(url, { waitUntil: 'load', timeout: 120_000 });
   const title = await page.title();
-  if (!title.includes('SOVEREIGN')) problems.push(`unexpected page title: "${title}"`);
+  if (!/cityhood/i.test(title)) problems.push(`unexpected page title: "${title}"`);
   step('page loaded, waiting for the title screen');
   // software WebGL on CI machines is slow: startup renders every build-menu thumbnail
   await page.locator('#tStart').click({ timeout: 180_000 });         // "Start Governing"

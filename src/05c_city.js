@@ -227,9 +227,9 @@ function initGfx() { let q = null; try { q = localStorage.getItem('sovereign_gfx
 function exportSave() {
   saveGame(true); let s = null; try { s = localStorage.getItem(SAVE_KEY); } catch (e) { }
   if (!s) { toast('No save yet', 'Start playing first', 'bad', 'alert'); return; }
-  const n = homeN(), name = (n ? n.name : 'sovereign').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'nation';
+  const n = homeN(), name = (n ? n.name : 'cityhood').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'nation';
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([s], { type: 'application/json' }));
-  a.download = `sovereign-${name}-year-${Math.floor(S.day / 360) + 1}.json`; document.body.appendChild(a); a.click(); a.remove();
+  a.download = `cityhood-${name}-year-${Math.floor(S.day / 360) + 1}.json`; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000); toast('Save exported', 'Keep this .json file to continue on another device', 'info', 'download');
 }
 const validSave = d => !!(d && typeof d.seed === 'number' && Array.isArray(d.nations) && d.nations.length && Array.isArray(d.blds) && Array.isArray(d.owner) && Array.isArray(d.roads));
@@ -239,7 +239,7 @@ function importSave() {
     const f = inp.files && inp.files[0]; if (!f) return;
     f.text().then(t => {
       let d = null; try { d = JSON.parse(t); } catch (e) { }
-      if (!validSave(d)) { if (S.started) toast('Invalid file', 'Choose a SOVEREIGN save file (.json)', 'bad', 'alert'); else modal({ title: 'Invalid file', sub: 'Choose a SOVEREIGN save file (.json)', icon: 'alert', buttons: [{ l: 'OK', pri: 1 }] }); return; }
+      if (!validSave(d)) { if (S.started) toast('Invalid file', 'Choose a Cityhood save file (.json)', 'bad', 'alert'); else modal({ title: 'Invalid file', sub: 'Choose a Cityhood save file (.json)', icon: 'alert', buttons: [{ l: 'OK', pri: 1 }] }); return; }
       const nm = d.nations[d.active || 0]?.name || '';
       modal({ title: 'Import save?', sub: `${esc(nm)} · ${dateStr(d.day || 0)}`, icon: 'upload', html: '<p>The save in this browser will be replaced by the selected file, and the game will reload.</p>', buttons: [{ l: 'Cancel' }, { l: `${ico('upload')} Import & load`, pri: 1, f: () => { try { localStorage.setItem(SAVE_KEY, t); location.reload(); } catch (e) { modal({ title: 'Import failed', sub: 'Browser storage is unavailable', icon: 'alert', buttons: [{ l: 'OK', pri: 1 }] }); } } }] });
     });

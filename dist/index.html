@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>SOVEREIGN — Build Your Nation</title>
-<meta name="description" content="SOVEREIGN — a 3D nation builder. Build your nation from scratch, become president, and found new nations.">
+<title>Cityhood — Build a City. Rule a Nation.</title>
+<meta name="description" content="Cityhood — a 3D city and nation builder in your browser. Build a city from scratch, become president and grow it into a superpower.">
 <meta name="theme-color" content="#081427">
-<meta property="og:title" content="SOVEREIGN — Build Your Nation">
+<meta property="og:title" content="Cityhood — Build a City. Rule a Nation.">
 <meta property="og:description" content="3D nation builder: build cities, run the economy, and lead up to 5 nations.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%233ee0c8'/%3E%3Cstop offset='1' stop-color='%238f7dff'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='%23081427'/%3E%3Cpath d='M14 44h36M18 44V28M26 44V28M38 44V28M46 44V28M12 28l20-12 20 12z' stroke='url(%23g)' stroke-width='4' fill='none' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -364,13 +364,13 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bac
 <div id="tip" class="hidden"></div>
 <div id="modal" class="hidden"><div class="mbox" id="mbox"></div></div>
 <div id="title" class="hidden"></div>
-<div id="loading"><div class="lb2"><div class="logo">SOVEREIGN</div><div class="lbar"><i id="lprog"></i></div><div id="ltxt">Preparing the world…</div></div></div>
+<div id="loading"><div class="lb2"><div class="logo">CITYHOOD</div><div class="lbar"><i id="lprog"></i></div><div id="ltxt">Preparing the world…</div></div></div>
 
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 
 /* =====================================================================
-   SOVEREIGN — Nation Builder  ·  single-file prototype
+   CITYHOOD — City & Nation Builder  ·  single-file prototype
    ===================================================================== */
 const MAP = 160, HALF = MAP / 2, DAY_SEC = 0.8, SAVE_KEY = 'sovereign_save_v1', MAX_PLAYER_NATIONS = 5;
 const T = { DEEP: 0, SHALLOW: 1, SAND: 2, GRASS: 3, FOREST: 4, HILL: 5, MTN: 6 };
@@ -3388,9 +3388,9 @@ function initGfx() { let q = null; try { q = localStorage.getItem('sovereign_gfx
 function exportSave() {
   saveGame(true); let s = null; try { s = localStorage.getItem(SAVE_KEY); } catch (e) { }
   if (!s) { toast('No save yet', 'Start playing first', 'bad', 'alert'); return; }
-  const n = homeN(), name = (n ? n.name : 'sovereign').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'nation';
+  const n = homeN(), name = (n ? n.name : 'cityhood').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'nation';
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([s], { type: 'application/json' }));
-  a.download = `sovereign-${name}-year-${Math.floor(S.day / 360) + 1}.json`; document.body.appendChild(a); a.click(); a.remove();
+  a.download = `cityhood-${name}-year-${Math.floor(S.day / 360) + 1}.json`; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 2000); toast('Save exported', 'Keep this .json file to continue on another device', 'info', 'download');
 }
 const validSave = d => !!(d && typeof d.seed === 'number' && Array.isArray(d.nations) && d.nations.length && Array.isArray(d.blds) && Array.isArray(d.owner) && Array.isArray(d.roads));
@@ -3400,7 +3400,7 @@ function importSave() {
     const f = inp.files && inp.files[0]; if (!f) return;
     f.text().then(t => {
       let d = null; try { d = JSON.parse(t); } catch (e) { }
-      if (!validSave(d)) { if (S.started) toast('Invalid file', 'Choose a SOVEREIGN save file (.json)', 'bad', 'alert'); else modal({ title: 'Invalid file', sub: 'Choose a SOVEREIGN save file (.json)', icon: 'alert', buttons: [{ l: 'OK', pri: 1 }] }); return; }
+      if (!validSave(d)) { if (S.started) toast('Invalid file', 'Choose a Cityhood save file (.json)', 'bad', 'alert'); else modal({ title: 'Invalid file', sub: 'Choose a Cityhood save file (.json)', icon: 'alert', buttons: [{ l: 'OK', pri: 1 }] }); return; }
       const nm = d.nations[d.active || 0]?.name || '';
       modal({ title: 'Import save?', sub: `${esc(nm)} · ${dateStr(d.day || 0)}`, icon: 'upload', html: '<p>The save in this browser will be replaced by the selected file, and the game will reload.</p>', buttons: [{ l: 'Cancel' }, { l: `${ico('upload')} Import & load`, pri: 1, f: () => { try { localStorage.setItem(SAVE_KEY, t); location.reload(); } catch (e) { modal({ title: 'Import failed', sub: 'Browser storage is unavailable', icon: 'alert', buttons: [{ l: 'OK', pri: 1 }] }); } } }] });
     });
@@ -4020,7 +4020,7 @@ function enterGame(fresh) {
   else if (S.upgraded) {
     const from = S.upgraded; S.upgraded = 0;
     setTimeout(() => modal({
-      title: "SOVEREIGN v0.4 — what's new", sub: from < 2 ? `Your save continues in Career mode · ${dif().n}` : 'A more real, living world', icon: 'sparkle', wide: 1,
+      title: "Cityhood v0.4 — what's new", sub: from < 2 ? `Your save continues in Career mode · ${dif().n}` : 'A more real, living world', icon: 'sparkle', wide: 1,
       html: `<div class="lst" style="font-size:12.5px">${[['Living city', 'Buses, pedestrians, planes taking off and ships sailing to your ports; rush-hour traffic'], ['Weather & seasons', 'Rainy and dry seasons, storms that cut solar output; season-dependent disasters'], ['Transport', 'Bus Terminal and Metro Station (key T) add commuter capacity'], ['Citizens', 'A live feed of what people say about their district — click to see the place'], ['Real economy', 'Inflation, real GDP growth, quarterly reports and ministry budgets'], ['Calendar', 'New Year fireworks, Independence Day and a moving Eid holiday']].concat(from < 2 ? [['Real challenges', 'Public demand, fiscal crises & IMF bailouts, impeachment, elections you can lose'], ['Victory & endings', 'Become a Superpower, or serve a full 20-year term and earn your place in history'], ['Living neighbors', 'AI personalities, building upgrades, tariffs, sanctions, territorial claims, trade offers'], ['Decisions that matter', 'Chained events with effects lasting months + 7 new policies'], ['Zoning & renewal', 'Mark zones (Z) and private developers build on their own; automatic upgrades via policy'], ['A living city', 'Traffic, land value, disasters, background music, graphics settings, save export/import']] : []).map(x => `<div class="kv"><span>${x[0]}</span><span>${x[1]}</span></div>`).join('')}</div>`,
       buttons: [{ l: `${ico('play')} Continue`, pri: 1 }]
     }), 700);
@@ -4030,7 +4030,7 @@ function renderTitle() {
   const save = readSave(); let col = NCOLORS[0], mode = 'career', diff = 'normal';
   $('#title').innerHTML = `<div class="tp">
     <div class="kick">Nation Builder · 3D</div>
-    <div class="logo">SOVEREIGN</div>
+    <div class="logo">CITYHOOD</div>
     <div class="tag">Take charge of a stretch of continent, some starting capital and basic facilities. Build your nation from scratch — roads, buildings, seaports, airports, all the way up to an iconic tower — then found new nations and become President of them all.</div>
     <div class="glass tcard">
       <label class="flbl" style="margin-top:0">President name</label><input class="tinput" id="tPres" maxlength="24" placeholder="Your name">

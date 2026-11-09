@@ -90,7 +90,7 @@ jobs:
         run: |
           for _ in $(seq 1 24); do
             code="$(curl -s -o /dev/null -w '%{http_code}' "$PAGE_URL")"
-            [ "$code" = 200 ] && curl -s "$PAGE_URL" | grep -q SOVEREIGN && { echo "Live: $PAGE_URL"; exit 0; }
+            [ "$code" = 200 ] && curl -s "$PAGE_URL" | grep -qi cityhood && { echo "Live: $PAGE_URL"; exit 0; }
             echo "HTTP $code, retrying..."; sleep 5
           done
           echo "::error::$PAGE_URL did not come online"; exit 1
@@ -204,7 +204,7 @@ jobs:
           echo "http:// -> $redirect"
           [[ "$redirect" =~ ^30[18]\ https:// ]] || fail "HTTP does not redirect to HTTPS ($redirect)"
           body="$(curl -sS "$url")"
-          grep -q 'SOVEREIGN' <<<"$body" || fail "page does not contain SOVEREIGN"
+          grep -qi 'cityhood' <<<"$body" || fail "page does not contain Cityhood"
           grep -q 'cdn.jsdelivr.net/npm/three@0.160.0' <<<"$body" || fail "page does not import three@0.160.0"
           echo "Live: $url"
 

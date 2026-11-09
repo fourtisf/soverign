@@ -1,4 +1,4 @@
-# SOVEREIGN — Handoff (v0.4 prototype)
+# Cityhood (formerly SOVEREIGN) — Handoff (v0.4 prototype)
 
 > 3D nation builder. The player is president: starts with land, money and basic facilities, builds roads and buildings, grows a country, then unlocks diplomacy and founds up to 5 nations.
 > Status: **playable prototype.** It is pure client side, with no backend yet. v0.3 adds win/lose conditions, difficulty, competitive AI, lasting events, zoning, traffic, land value, disasters, music, graphics settings and save export/import (see §3.7–3.8). v0.4 is fully in English and adds realism: living city, weather and seasons, transport buildings, a citizens' feed, calendar moments and a real economy (see §3.9).

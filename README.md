@@ -1,4 +1,4 @@
-# SOVEREIGN — Build Your Nation
+# Cityhood — Build a City. Rule a Nation.
 
 A 3D nation-builder that runs in the browser. You are the president: start with land, some capital and basic facilities, then grow your country. Once it is developed, open diplomacy and found up to 5 nations.
 
@@ -13,6 +13,7 @@ A 3D nation-builder that runs in the browser. You are the president: start with 
 - **Settings:** background music, graphics quality, and save export/import.
 
 ## Play
+- **Live:** https://cityhood.live
 - **Online (free, no domain or server):** https://fourtisf.github.io/soverign/. GitHub Pages deploys it automatically on every push to the default branch. Enable it once under **Settings → Pages → Source: GitHub Actions**.
 - **Offline file:** open `dist/index.html` in Chrome. It needs internet for Three.js and the fonts.
 - **Local server:** `npm run preview`, then open http://localhost:4173
@@ -23,6 +24,16 @@ node build.mjs                 # src/ → dist/index.html
 ./deploy/deploy.sh user@vps    # upload to /var/www/sovereign/dist (Nginx)
 ```
 The Nginx config is in `deploy/nginx.conf.example`. For Vercel, `vercel.json` is enough.
+
+## Deploy on a VPS straight from GitHub
+Run on the server as root (Ubuntu + Nginx). The DNS A record for the domain must point to the server.
+```bash
+apt update && apt install -y nginx git certbot python3-certbot-nginx
+git clone https://github.com/fourtisf/soverign.git /opt/cityhood
+mkdir -p /var/www/sovereign/dist && cp -r /opt/cityhood/dist/. /var/www/sovereign/dist/
+bash /opt/cityhood/deploy/server-setup.sh cityhood.live
+```
+`server-setup.sh` adds `www.<domain>` automatically when it points to the same server. To publish a newer version later, run `bash /opt/cityhood/deploy/update.sh`.
 
 ## Automatic deploy with GitHub Actions
 `.github/workflows/deploy.yml` runs on every push:

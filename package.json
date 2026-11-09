@@ -1,8 +1,8 @@
 {
-  "name": "sovereign",
+  "name": "cityhood",
   "version": "0.4.0",
   "private": true,
-  "description": "SOVEREIGN — 3D nation builder (single-file Three.js prototype)",
+  "description": "Cityhood — 3D city & nation builder (single-file Three.js prototype)",
   "type": "module",
   "scripts": {
     "build": "node build.mjs",

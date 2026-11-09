@@ -179,7 +179,7 @@ function enterGame(fresh) {
   else if (S.upgraded) {
     const from = S.upgraded; S.upgraded = 0;
     setTimeout(() => modal({
-      title: "SOVEREIGN v0.4 — what's new", sub: from < 2 ? `Your save continues in Career mode · ${dif().n}` : 'A more real, living world', icon: 'sparkle', wide: 1,
+      title: "Cityhood v0.4 — what's new", sub: from < 2 ? `Your save continues in Career mode · ${dif().n}` : 'A more real, living world', icon: 'sparkle', wide: 1,
       html: `<div class="lst" style="font-size:12.5px">${[['Living city', 'Buses, pedestrians, planes taking off and ships sailing to your ports; rush-hour traffic'], ['Weather & seasons', 'Rainy and dry seasons, storms that cut solar output; season-dependent disasters'], ['Transport', 'Bus Terminal and Metro Station (key T) add commuter capacity'], ['Citizens', 'A live feed of what people say about their district — click to see the place'], ['Real economy', 'Inflation, real GDP growth, quarterly reports and ministry budgets'], ['Calendar', 'New Year fireworks, Independence Day and a moving Eid holiday']].concat(from < 2 ? [['Real challenges', 'Public demand, fiscal crises & IMF bailouts, impeachment, elections you can lose'], ['Victory & endings', 'Become a Superpower, or serve a full 20-year term and earn your place in history'], ['Living neighbors', 'AI personalities, building upgrades, tariffs, sanctions, territorial claims, trade offers'], ['Decisions that matter', 'Chained events with effects lasting months + 7 new policies'], ['Zoning & renewal', 'Mark zones (Z) and private developers build on their own; automatic upgrades via policy'], ['A living city', 'Traffic, land value, disasters, background music, graphics settings, save export/import']] : []).map(x => `<div class="kv"><span>${x[0]}</span><span>${x[1]}</span></div>`).join('')}</div>`,
       buttons: [{ l: `${ico('play')} Continue`, pri: 1 }]
     }), 700);
@@ -189,7 +189,7 @@ function renderTitle() {
   const save = readSave(); let col = NCOLORS[0], mode = 'career', diff = 'normal';
   $('#title').innerHTML = `<div class="tp">
     <div class="kick">Nation Builder · 3D</div>
-    <div class="logo">SOVEREIGN</div>
+    <div class="logo">CITYHOOD</div>
     <div class="tag">Take charge of a stretch of continent, some starting capital and basic facilities. Build your nation from scratch — roads, buildings, seaports, airports, all the way up to an iconic tower — then found new nations and become President of them all.</div>
     <div class="glass tcard">
       <label class="flbl" style="margin-top:0">President name</label><input class="tinput" id="tPres" maxlength="24" placeholder="Your name">
