@@ -1,4 +1,4 @@
-// Headless check that the game boots: load the page, click "Mulai Memerintah",
+// Headless check that the game boots: load the page, click "Start Governing",
 // wait for the welcome dialog and fail on any console error, uncaught exception
 // or failed request. Saves a screenshot to smoke-test.png.
 //
@@ -55,9 +55,9 @@ try {
   if (!title.includes('SOVEREIGN')) problems.push(`unexpected page title: "${title}"`);
   step('page loaded, waiting for the title screen');
   // software WebGL on CI machines is slow: startup renders every build-menu thumbnail
-  await page.locator('#tStart').click({ timeout: 180_000 });         // "Mulai Memerintah"
-  step('clicked "Mulai Memerintah"');
-  await page.getByText('Selamat bertugas').waitFor({ timeout: 60_000 });
+  await page.locator('#tStart').click({ timeout: 180_000 });         // "Start Governing"
+  step('clicked "Start Governing"');
+  await page.getByText('Welcome to office').waitFor({ timeout: 60_000 });
   step('welcome dialog shown, letting a few in-game days run');
   await page.waitForTimeout(5_000);
   const canvas = await page.locator('canvas').first().boundingBox();

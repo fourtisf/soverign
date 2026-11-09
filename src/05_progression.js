@@ -1,6 +1,6 @@
 
 /* =====================================================================
-   PROGRESSION · PROGRAM KERJA · DEMAND · DATA VIEWS · ALERTS
+   PROGRESSION · AGENDA · DEMAND · DATA VIEWS · ALERTS
    ===================================================================== */
 Object.assign(I, {
   scan: '<path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><path d="M8 15l3-3 2 2 3-4"/>',
@@ -16,36 +16,36 @@ function bump(k, v = 1) { S.cnt[k] = (S.cnt[k] || 0) + v; }
 function bumpB(t) { S.cnt.b[t] = (S.cnt.b[t] || 0) + 1; }
 const nf = v => v >= 1e5 ? fmt(v) : fmtPop(v);
 
-/* ---------------- program kerja ---------------- */
-const CHAPTERS = ['Bab 1 · Fondasi Bangsa', 'Bab 2 · Kota yang Tumbuh', 'Bab 3 · Menuju Negara Maju', 'Bab 4 · Kekuatan Regional'];
+/* ---------------- agenda ---------------- */
+const CHAPTERS = ['Chapter 1 · Laying the Foundations', 'Chapter 2 · A Growing City', 'Chapter 3 · Becoming Developed', 'Chapter 4 · Regional Power'];
 const CH_BONUS = [3e6, 6e6, 12e6, 30e6];
 const MISSIONS = [
-  { ch: 0, id: 'road20', t: 'Perluas jaringan jalan', d: 'Bangun 20 petak jalan baru', p: () => [S.cnt.road, 20], r: 6e5, go: 'road' },
-  { ch: 0, id: 'house10', t: 'Rumah untuk rakyat', d: 'Bangun 10 Rumah Tapak di tepi jalan', p: () => [cntB('house'), 10], r: 8e5, go: 'house' },
-  { ch: 0, id: 'shop6', t: 'Hidupkan ekonomi lokal', d: 'Bangun 6 Ruko', p: () => [cntB('shop'), 6], r: 8e5, go: 'shop' },
-  { ch: 0, id: 'energy2', t: 'Energi untuk masa depan', d: 'Bangun 2 pembangkit (Surya, Angin, atau PLTU)', p: () => [cntB('solar') + cntB('wind') + cntB('coal'), 2], r: 1e6, go: 'wind' },
-  { ch: 0, id: 'park3', t: 'Ruang hijau warga', d: 'Bangun 3 Taman Kota', p: () => [cntB('park'), 3], r: 5e5, go: 'park' },
-  { ch: 0, id: 'pop2k', t: '2.000 jiwa', d: 'Capai 2.000 penduduk', p: () => [Math.floor(mainNation().pop), 2000], r: 1e6 },
-  { ch: 1, id: 'up5', t: 'Renovasi kota', d: 'Tingkatkan 5 bangunan (klik bangunan → Tingkatkan)', p: () => [S.cnt.up, 5], r: 1.5e6 },
-  { ch: 1, id: 'fac2', t: 'Era industri', d: 'Bangun 2 Pabrik (terbuka di 2.400 penduduk)', p: () => [cntB('factory'), 2], r: 2e6, go: 'factory' },
-  { ch: 1, id: 'land40', t: 'Perluas wilayah', d: 'Beli 40 petak lahan di perbatasan', p: () => [S.cnt.land, 40], r: 1.5e6, go: 'land' },
-  { ch: 1, id: 'apt4', t: 'Hunian vertikal', d: 'Bangun 4 Apartemen (terbuka di 3.000 penduduk)', p: () => [cntB('apartment'), 4], r: 2e6, go: 'apartment' },
-  { ch: 1, id: 'hap75', t: 'Rakyat bahagia', d: 'Kebahagiaan ≥ 75% dengan ≥ 3.000 penduduk', p: () => [mainNation().pop >= 3000 ? Math.round(mainNation().happy * 100) : 0, 75], r: 2e6, u: '%' },
-  { ch: 1, id: 'net150', t: 'Kas yang sehat', d: 'Saldo bersih ≥ +$150 rb per bulan', p: () => [Math.max(0, Math.round((mainNation().rate.net || 0) / 1000)), 150], r: 2.5e6, u: 'k' },
-  { ch: 2, id: 'pop10k', t: 'Kota besar', d: 'Capai 10.000 penduduk', p: () => [Math.floor(mainNation().pop), 10000], r: 4e6 },
-  { ch: 2, id: 'mall2', t: 'Pusat belanja', d: 'Bangun 2 Mal', p: () => [cntB('mall'), 2], r: 3e6, go: 'mall' },
-  { ch: 2, id: 'parl', t: 'Demokrasi berdiri', d: 'Bangun Gedung Parlemen', p: () => [cntB('parliament'), 1], r: 5e6, go: 'parliament' },
-  { ch: 2, id: 'hosp', t: 'Kesehatan untuk semua', d: 'Bangun Rumah Sakit (terbuka di 12.000 penduduk)', p: () => [cntB('hospital'), 1], r: 3e6, go: 'hospital' },
-  { ch: 2, id: 'monu', t: 'Simbol bangsa', d: 'Bangun Monumen Nasional', p: () => [cntB('monument'), 1], r: 6e6, go: 'monument' },
-  { ch: 2, id: 'appr70', t: 'Presiden dicintai rakyat', d: 'Approval ≥ 70% dengan ≥ 10.000 penduduk', p: () => [mainNation().pop >= 10000 ? Math.round(mainNation().approval) : 0, 70], r: 6e6, u: '%' },
-  { ch: 3, id: 'pop25k', t: 'Negara maju', d: 'Capai 25.000 penduduk — membuka pendirian negara baru', p: () => [Math.floor(mainNation().pop), 25000], r: 10e6 },
-  { ch: 3, id: 'trade', t: 'Mitra internasional', d: 'Tanda tangani 1 perjanjian dagang', p: () => [S.cnt.trade, 1], r: 5e6, go: 'diplo' },
-  { ch: 3, id: 'port', t: 'Gerbang samudra', d: 'Bangun Pelabuhan di tepi laut', p: () => [cntB('port'), 1], r: 8e6, go: 'port' },
-  { ch: 3, id: 'stad', t: 'Kebanggaan olahraga', d: 'Bangun Stadion Nasional', p: () => [cntB('stadium'), 1], r: 8e6, go: 'stadium' },
-  { ch: 3, id: 'pop50k', t: 'Metropolitan', d: 'Capai 50.000 penduduk', p: () => [Math.floor(mainNation().pop), 50000], r: 20e6 },
-  { ch: 3, id: 'air', t: 'Terbang ke dunia', d: 'Bangun Bandara Internasional', p: () => [cntB('airport'), 1], r: 20e6, go: 'airport' },
-  { ch: 3, id: 'found', t: 'Presiden multi-negara', d: 'Dirikan negara kedua', p: () => [playerNations().length - 1, 1], r: 15e6, go: 'found' },
-  { ch: 3, id: 'spire', t: 'Menara tertinggi dunia', d: 'Bangun Menara Ikonik', p: () => [cntB('spire'), 1], r: 50e6, go: 'spire' },
+  { ch: 0, id: 'road20', t: 'Expand the road network', d: 'Build 20 new road tiles', p: () => [S.cnt.road, 20], r: 6e5, go: 'road' },
+  { ch: 0, id: 'house10', t: 'Homes for the people', d: 'Build 10 Houses along a road', p: () => [cntB('house'), 10], r: 8e5, go: 'house' },
+  { ch: 0, id: 'shop6', t: 'Kick-start the local economy', d: 'Build 6 Shophouses', p: () => [cntB('shop'), 6], r: 8e5, go: 'shop' },
+  { ch: 0, id: 'energy2', t: 'Power for the future', d: 'Build 2 power plants (Solar, Wind or Coal)', p: () => [cntB('solar') + cntB('wind') + cntB('coal'), 2], r: 1e6, go: 'wind' },
+  { ch: 0, id: 'park3', t: 'Green space for citizens', d: 'Build 3 City Parks', p: () => [cntB('park'), 3], r: 5e5, go: 'park' },
+  { ch: 0, id: 'pop2k', t: '2,000 citizens', d: 'Reach a population of 2,000', p: () => [Math.floor(mainNation().pop), 2000], r: 1e6 },
+  { ch: 1, id: 'up5', t: 'City renewal', d: 'Upgrade 5 buildings (click a building → Upgrade)', p: () => [S.cnt.up, 5], r: 1.5e6 },
+  { ch: 1, id: 'fac2', t: 'Industrial age', d: 'Build 2 Factories (unlocks at 2,400 population)', p: () => [cntB('factory'), 2], r: 2e6, go: 'factory' },
+  { ch: 1, id: 'land40', t: 'Expand the territory', d: 'Buy 40 tiles of land along the border', p: () => [S.cnt.land, 40], r: 1.5e6, go: 'land' },
+  { ch: 1, id: 'apt4', t: 'Vertical living', d: 'Build 4 Apartments (unlocks at 3,000 population)', p: () => [cntB('apartment'), 4], r: 2e6, go: 'apartment' },
+  { ch: 1, id: 'hap75', t: 'A happy people', d: 'Happiness ≥ 75% with ≥ 3,000 population', p: () => [mainNation().pop >= 3000 ? Math.round(mainNation().happy * 100) : 0, 75], r: 2e6, u: '%' },
+  { ch: 1, id: 'net150', t: 'A healthy treasury', d: 'Net balance ≥ +$150K per month', p: () => [Math.max(0, Math.round((mainNation().rate.net || 0) / 1000)), 150], r: 2.5e6, u: 'k' },
+  { ch: 2, id: 'pop10k', t: 'Big city', d: 'Reach a population of 10,000', p: () => [Math.floor(mainNation().pop), 10000], r: 4e6 },
+  { ch: 2, id: 'mall2', t: 'Shopping destination', d: 'Build 2 Malls', p: () => [cntB('mall'), 2], r: 3e6, go: 'mall' },
+  { ch: 2, id: 'parl', t: 'Democracy takes root', d: 'Build the Parliament', p: () => [cntB('parliament'), 1], r: 5e6, go: 'parliament' },
+  { ch: 2, id: 'hosp', t: 'Health care for all', d: 'Build a Hospital (unlocks at 12,000 population)', p: () => [cntB('hospital'), 1], r: 3e6, go: 'hospital' },
+  { ch: 2, id: 'monu', t: 'A national symbol', d: 'Build the National Monument', p: () => [cntB('monument'), 1], r: 6e6, go: 'monument' },
+  { ch: 2, id: 'appr70', t: 'A beloved President', d: 'Approval ≥ 70% with ≥ 10,000 population', p: () => [mainNation().pop >= 10000 ? Math.round(mainNation().approval) : 0, 70], r: 6e6, u: '%' },
+  { ch: 3, id: 'pop25k', t: 'Developed nation', d: 'Reach a population of 25,000 — unlocks founding new nations', p: () => [Math.floor(mainNation().pop), 25000], r: 10e6 },
+  { ch: 3, id: 'trade', t: 'International partners', d: 'Sign 1 trade agreement', p: () => [S.cnt.trade, 1], r: 5e6, go: 'diplo' },
+  { ch: 3, id: 'port', t: 'Gateway to the sea', d: 'Build a Seaport on the coast', p: () => [cntB('port'), 1], r: 8e6, go: 'port' },
+  { ch: 3, id: 'stad', t: 'Sporting pride', d: 'Build the National Stadium', p: () => [cntB('stadium'), 1], r: 8e6, go: 'stadium' },
+  { ch: 3, id: 'pop50k', t: 'Metropolis', d: 'Reach a population of 50,000', p: () => [Math.floor(mainNation().pop), 50000], r: 20e6 },
+  { ch: 3, id: 'air', t: 'Open to the world', d: 'Build the International Airport', p: () => [cntB('airport'), 1], r: 20e6, go: 'airport' },
+  { ch: 3, id: 'found', t: 'Multi-nation President', d: 'Found a second nation', p: () => [playerNations().length - 1, 1], r: 15e6, go: 'found' },
+  { ch: 3, id: 'spire', t: "The world's tallest tower", d: 'Build the Iconic Tower', p: () => [cntB('spire'), 1], r: 50e6, go: 'spire' },
 ];
 function curChapter() { const m = MISSIONS.find(m => !S.mis.includes(m.id)); return m ? m.ch : -1; }
 function activeMissions() { const ch = curChapter(); return ch < 0 ? [] : MISSIONS.filter(m => m.ch === ch && !S.mis.includes(m.id)).slice(0, 3); }
@@ -55,11 +55,11 @@ function checkMissions() {
   for (const m of activeMissions()) {
     const [c, t] = m.p(); if (c < t) continue;
     S.mis.push(m.id); const n = act(); n.treasury += m.r; trackKey = ''; relieve(n, 3);
-    toast(`Program kerja tuntas: ${m.t}`, `Hadiah ${money(m.r)} masuk kas ${n.name}`, 'gold', 'check'); sfx('coin'); addNews(`Program kerja "${m.t}" tuntas.`);
+    toast(`Agenda item complete: ${m.t}`, `${money(m.r)} reward paid into the ${n.name} treasury`, 'gold', 'check'); sfx('coin'); addNews(`Agenda item "${m.t}" completed.`);
     if (MISSIONS.filter(x => x.ch === m.ch).every(x => S.mis.includes(x.id))) {
-      n.treasury += CH_BONUS[m.ch]; relieve(n, 8); addNews(`${CHAPTERS[m.ch]} selesai.`); const next = CHAPTERS[m.ch + 1];
-      if ($('#modal').classList.contains('hidden')) modal({ title: `${CHAPTERS[m.ch]} selesai!`, sub: `Bonus bab ${money(CH_BONUS[m.ch])} diterima.`, icon: 'sparkle', html: next ? `<p>Babak baru dimulai: <b>${next}</b>. Target berikutnya ada di panel Program Kerja (kiri atas).</p>` : (career() ? '<p>Semua program kerja tuntas! Langkah terakhir menuju <b>Negara Adidaya</b>: lihat syaratnya di Statistik → Target & Peringkat.</p>' : '<p>Semua program kerja tuntas. Negaramu kini adidaya!</p>'), buttons: [{ l: 'Lanjutkan', pri: 1 }] });
-      else toast(`${CHAPTERS[m.ch]} selesai!`, `Bonus ${money(CH_BONUS[m.ch])}`, 'gold', 'sparkle');
+      n.treasury += CH_BONUS[m.ch]; relieve(n, 8); addNews(`${CHAPTERS[m.ch]} complete.`); const next = CHAPTERS[m.ch + 1];
+      if ($('#modal').classList.contains('hidden')) modal({ title: `${CHAPTERS[m.ch]} complete!`, sub: `Chapter bonus of ${money(CH_BONUS[m.ch])} received.`, icon: 'sparkle', html: next ? `<p>A new chapter begins: <b>${next}</b>. Your next goals are in the Agenda panel (top left).</p>` : (career() ? '<p>Every agenda item is done! The last step to becoming a <b>Superpower</b>: see the requirements under Statistics → Goals & Rankings.</p>' : '<p>Every agenda item is done. Your nation is now a superpower!</p>'), buttons: [{ l: 'Continue', pri: 1 }] });
+      else toast(`${CHAPTERS[m.ch]} complete!`, `Bonus ${money(CH_BONUS[m.ch])}`, 'gold', 'sparkle');
     }
     break;
   }
@@ -68,16 +68,16 @@ function checkUnlocks() {
   const mp = Math.max(0, ...playerNations().map(n => n.pop));
   for (const k in UNL) if (!S.unl[k] && mp >= UNL[k]) {
     S.unl[k] = true; sfx('coin'); renderMenu();
-    if (k === 'diplo') { toast('Diplomasi internasional terbuka!', 'Kini kamu bisa berdagang & beraliansi dengan negara tetangga', 'gold', 'globe'); addNews('Negara tetangga membuka hubungan diplomatik.'); }
-    else { toast('Pendirian negara baru terbuka!', 'Kini kamu bisa mendirikan hingga 5 negara', 'gold', 'flag'); addNews('Negara siap mendirikan negara-negara baru.'); if (S.drawer === 'land') refreshDrawer(); }
+    if (k === 'diplo') { toast('International diplomacy unlocked!', 'You can now trade and form alliances with neighboring nations', 'gold', 'globe'); addNews('Neighboring nations have opened diplomatic relations.'); }
+    else { toast('Founding new nations unlocked!', 'You can now found up to 5 nations', 'gold', 'flag'); addNews('Our nation is now ready to found new nations.'); if (S.drawer === 'land') refreshDrawer(); }
   }
 }
 function lockedModal(k) {
   const m = mainNation(), need = UNL[k], p = clamp(m.pop / need, 0, 1);
   const info = k === 'diplo'
-    ? { t: 'Diplomasi masih terkunci', i: 'globe', d: 'Fokus membangun negaramu dulu. Begitu rakyatmu cukup banyak, negara tetangga akan membuka jalur dagang, aliansi, dan jual-beli wilayah.' }
-    : { t: 'Pendirian negara baru masih terkunci', i: 'flag', d: 'Jadikan negaramu negara maju lebih dulu. Setelah itu kamu bisa mendirikan hingga 5 negara dan menjadi presiden semuanya.' };
-  modal({ title: info.t, sub: `Terbuka saat ${fmtPop(need)} penduduk`, icon: info.i, html: `<p>${info.d}</p><div class="box" style="margin-top:14px"><div class="row" style="justify-content:space-between"><div class="lb">Penduduk ${esc(m.name)}</div><div style="font-weight:800">${fmtPop(m.pop)} / ${fmtPop(need)}</div></div><div class="bar ok" style="margin-top:8px;height:7px"><i style="width:${p * 100}%"></i></div></div>`, buttons: [{ l: 'Oke, bangun dulu', pri: 1 }] });
+    ? { t: 'Diplomacy is still locked', i: 'globe', d: 'Focus on building your nation first. Once your population is large enough, neighboring nations will open up trade, alliances and territory deals.' }
+    : { t: 'Founding new nations is still locked', i: 'flag', d: 'Make your nation a developed one first. Then you can found up to 5 nations and be President of them all.' };
+  modal({ title: info.t, sub: `Unlocks at ${fmtPop(need)} population`, icon: info.i, html: `<p>${info.d}</p><div class="box" style="margin-top:14px"><div class="row" style="justify-content:space-between"><div class="lb">${esc(m.name)} population</div><div style="font-weight:800">${fmtPop(m.pop)} / ${fmtPop(need)}</div></div><div class="bar ok" style="margin-top:8px;height:7px"><i style="width:${p * 100}%"></i></div></div>`, buttons: [{ l: 'OK, back to building', pri: 1 }] });
 }
 function misGo(m) {
   const g = m && m.go; if (!g) return;
@@ -86,7 +86,7 @@ function misGo(m) {
   if (g === 'diplo') return openDiplo();
   if (g === 'found') { if (!S.unl.found) return lockedModal('found'); open('land'); setTool('found'); return; }
   const d = BT[g]; if (!d) return; const n = act();
-  if (d.unlock && n.pop < d.unlock) { toast(`${d.n} masih terkunci`, `Capai ${fmtPop(d.unlock)} penduduk`, 'wa', 'lock'); return; }
+  if (d.unlock && n.pop < d.unlock) { toast(`${d.n} is still locked`, `Reach ${fmtPop(d.unlock)} population`, 'wa', 'lock'); return; }
   open(d.c); setTool('build', g);
 }
 function renderTracker() {
@@ -94,9 +94,9 @@ function renderTracker() {
   const list = activeMissions(), ch = curChapter(), key = list.map(m => m.id).join(',') + '|' + S.trackOpen + '|' + ch;
   if (key !== trackKey) {
     trackKey = key;
-    if (ch < 0) { el.innerHTML = `<div class="trh"><div class="tri">${ico('crown')}</div><div><div class="trk">Program Kerja</div><div class="trt">Semua program tuntas!</div></div></div>`; return; }
+    if (ch < 0) { el.innerHTML = `<div class="trh"><div class="tri">${ico('crown')}</div><div><div class="trk">Agenda</div><div class="trt">Agenda complete!</div></div></div>`; return; }
     const tot = MISSIONS.filter(m => m.ch === ch).length, done = MISSIONS.filter(m => m.ch === ch && S.mis.includes(m.id)).length;
-    el.innerHTML = `<div class="trh" id="trH"><div class="tri">${ico('target')}</div><div style="min-width:0;flex:1"><div class="trk">Program Kerja · ${done}/${tot}</div><div class="trt">${CHAPTERS[ch]}</div></div><button class="trc ${S.trackOpen ? '' : 'cl'}">${ico('chev')}</button></div>
+    el.innerHTML = `<div class="trh" id="trH"><div class="tri">${ico('target')}</div><div style="min-width:0;flex:1"><div class="trk">Agenda · ${done}/${tot}</div><div class="trt">${CHAPTERS[ch]}</div></div><button class="trc ${S.trackOpen ? '' : 'cl'}">${ico('chev')}</button></div>
       <div class="trb"><i style="width:${done / tot * 100}%"></i></div>
       ${S.trackOpen ? `<div class="trl">${list.map(m => `<button class="mis" data-m="${m.id}"><span class="mck"></span><div class="mtx"><b>${m.t}</b><small>${m.d}</small><div class="bar ok"><i data-pb></i></div></div><div class="mrw"><span data-pv class="num"></span><em>+${money(m.r)}</em></div></button>`).join('')}</div>` : ''}`;
     el.querySelector('#trH').onclick = () => { S.trackOpen = !S.trackOpen; trackKey = ''; renderTracker(); sfx('click'); };
@@ -119,16 +119,16 @@ function demand(n) {
   const In = clamp(0.2 + (n.pop * 0.22 - ij) / Math.max(250, n.pop * 0.22) * 0.6 + u * 1.2 - Math.max(0, g) * 0.3, 0, 1);
   return [R, Cm, In];
 }
-const RCI_HTML = `<div class="tsep"></div><div class="rci" id="rci"><div><i></i><b>H</b></div><div><i></i><b>B</b></div><div><i></i><b>I</b></div><span class="tp"></span></div>`;
+const RCI_HTML = `<div class="tsep"></div><div class="rci" id="rci"><div><i></i><b>R</b></div><div><i></i><b>C</b></div><div><i></i><b>I</b></div><span class="tp"></span></div>`;
 function renderRCI() {
   const el = $('#rci'); if (!el || !S.started) return; const v = demand(act());
   el.querySelectorAll('i').forEach((x, k) => x.style.height = Math.max(4, v[k] * 100) + '%');
-  const tag = x => x > 0.66 ? 'tinggi' : x > 0.33 ? 'sedang' : 'rendah';
-  el.querySelector('.tp').innerHTML = `<b>Permintaan</b>&nbsp; Hunian ${tag(v[0])} · Bisnis ${tag(v[1])} · Industri ${tag(v[2])}`;
+  const tag = x => x > 0.66 ? 'high' : x > 0.33 ? 'medium' : 'low';
+  el.querySelector('.tp').innerHTML = `<b>Demand</b>&nbsp; Residential ${tag(v[0])} · Commercial ${tag(v[1])} · Industrial ${tag(v[2])}`;
 }
 
 /* ---------------- data views ---------------- */
-const OVL = [['hap', 'smile', 'Kebahagiaan'], ['land', 'coins', 'Nilai tanah'], ['edu', 'cap', 'Pendidikan'], ['health', 'heart', 'Kesehatan'], ['safety', 'shield', 'Keamanan'], ['fire', 'flame', 'Pemadam'], ['poll', 'factory', 'Polusi'], ['access', 'road', 'Akses & utilitas']];
+const OVL = [['hap', 'smile', 'Happiness'], ['land', 'coins', 'Land value'], ['edu', 'cap', 'Education'], ['health', 'heart', 'Health'], ['safety', 'shield', 'Safety'], ['fire', 'flame', 'Fire protection'], ['poll', 'factory', 'Pollution'], ['access', 'road', 'Access & utilities']];
 const OC = { bad: new THREE.Color('#ff4d6a'), mid: new THREE.Color('#ffc53d'), good: new THREE.Color('#2ee6a0'), dim: new THREE.Color('#5d6878'), svc: new THREE.Color('#7dd3fc'), white: new THREE.Color('#ffffff') };
 const _oc = new THREE.Color();
 function ramp(v, out = _oc) { v = clamp(v, 0, 1); return v < 0.5 ? out.copy(OC.bad).lerp(OC.mid, v * 2) : out.copy(OC.mid).lerp(OC.good, (v - 0.5) * 2); }
@@ -172,17 +172,17 @@ function buildOvField() {
 }
 function setOverlay(mode) {
   S.overlay = S.overlay === mode ? null : mode; paintOverlay(); buildOvField(); renderMMBar(); renderLegend(); renderDPop(); updateProblems();
-  if (S.overlay) toast(`Peta data: ${OVL.find(o => o[0] === S.overlay)[2]}`, 'Klik lagi atau tekan Esc untuk menutup', 'info', 'scan');
+  if (S.overlay) toast(`Data map: ${OVL.find(o => o[0] === S.overlay)[2]}`, 'Click again or press Esc to close', 'info', 'scan');
 }
 function renderDPop() {
   const el = $('#dpop'); if (!el) return;
-  el.innerHTML = OVL.map(o => `<button data-o="${o[0]}" class="${S.overlay === o[0] ? 'on' : ''}">${ico(o[1])}${o[2]}</button>`).join('') + (S.overlay ? `<button data-o="off">${ico('x')}Tutup peta data</button>` : '');
+  el.innerHTML = OVL.map(o => `<button data-o="${o[0]}" class="${S.overlay === o[0] ? 'on' : ''}">${ico(o[1])}${o[2]}</button>`).join('') + (S.overlay ? `<button data-o="off">${ico('x')}Close data map</button>` : '');
   el.querySelectorAll('[data-o]').forEach(b => b.onclick = () => { sfx('click'); el.classList.add('hidden'); if (b.dataset.o === 'off') setOverlay(S.overlay); else setOverlay(b.dataset.o); });
 }
 function renderLegend() {
   const el = $('#ovLeg'); if (!el) return; const m = S.overlay; if (!m) { el.classList.add('hidden'); return; }
-  const o = OVL.find(x => x[0] === m), L = m === 'poll' ? ['Tercemar', 'Bersih'] : m === 'access' ? ['Tanpa jalan', 'Normal'] : m === 'land' ? ['Rendah', 'Tinggi'] : ['Buruk', 'Baik'];
-  el.innerHTML = `<b>Peta data · ${o[2]}</b><div class="lg"><span>${L[0]}</span><i></i><span>${L[1]}</span></div>`; el.classList.remove('hidden');
+  const o = OVL.find(x => x[0] === m), L = m === 'poll' ? ['Polluted', 'Clean'] : m === 'access' ? ['No road', 'Normal'] : m === 'land' ? ['Low', 'High'] : ['Poor', 'Good'];
+  el.innerHTML = `<b>Data map · ${o[2]}</b><div class="lg"><span>${L[0]}</span><i></i><span>${L[1]}</span></div>`; el.classList.remove('hidden');
 }
 
 /* ---------------- problem markers ---------------- */

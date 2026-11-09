@@ -24,22 +24,22 @@ function portRot(x, z, s) {
 function checkSite(type, x, z, n, free) {
   const d = BT[type], s = d.s; let hill = 0;
   if (!free) {
-    if (d.nobuild) return 'Tidak dapat dibangun';
-    if (d.unlock && n.pop < d.unlock) return `Terkunci · butuh ${fmtPop(d.unlock)} penduduk`;
-    if (d.uniq && n.list.some(b => b.type === type)) return 'Hanya satu per negara';
+    if (d.nobuild) return 'Cannot be built';
+    if (d.unlock && n.pop < d.unlock) return `Locked · requires ${fmtPop(d.unlock)} population`;
+    if (d.uniq && n.list.some(b => b.type === type)) return 'Only one per nation';
   }
   for (let dz = 0; dz < s; dz++) for (let dx = 0; dx < s; dx++) {
-    const X = x + dx, Z = z + dz; if (!inb(X, Z)) return 'Di luar peta';
+    const X = x + dx, Z = z + dz; if (!inb(X, Z)) return 'Off the map';
     const i = ix(X, Z), t = terr[i];
-    if (owner[i] !== n.id) return 'Bukan wilayah negaramu';
-    if (t <= 1) return 'Tidak bisa di atas air'; if (t === T.MTN) return 'Medan pegunungan';
-    if (road[i]) return 'Ada jalan di sini'; if (tileB[i]) return 'Lahan sudah terpakai'; if (t === T.HILL) hill++;
+    if (owner[i] !== n.id) return 'Not your territory';
+    if (t <= 1) return 'Cannot build on water'; if (t === T.MTN) return 'Mountain terrain';
+    if (road[i]) return 'A road is here'; if (tileB[i]) return 'Land already in use'; if (t === T.HILL) hill++;
   }
-  if (d.needs === 'hill' && hill < Math.ceil(s * s / 2)) return 'Harus di perbukitan';
-  if (d.needs === 'coast' && portRot(x, z, s) < 0) return 'Harus menempel laut';
+  if (d.needs === 'hill' && hill < Math.ceil(s * s / 2)) return 'Must be on hills';
+  if (d.needs === 'coast' && portRot(x, z, s) < 0) return 'Must border the sea';
   return null;
 }
-function siteCost(type, x, z) { const d = BT[type]; let c = d.cost; for (let dz = 0; dz < d.s; dz++) for (let dx = 0; dx < d.s; dx++) if (W.treeAt.has(ix(x + dx, z + dz))) c += 1500; return c; }
+function siteCost(type, x, z, n) { const d = BT[type]; let c = d.cost; for (let dz = 0; dz < d.s; dz++) for (let dx = 0; dx < d.s; dx++) if (W.treeAt.has(ix(x + dx, z + dz))) c += 1500; return c * priceNow(n); }
 const easeOut = t => { const c1 = 1.5, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); };
 function bMatrix(b, sy) { _p.set(b.x + b.s / 2 - HALF, 0, b.z + b.s / 2 - HALF); _q.setFromAxisAngle(_up, b.rot * Math.PI / 2); _s.set(1, Math.max(0.02, sy), 1); return _m.compose(_p, _q, _s); }
 function bKey(b) { return `${b.type}|${b.level}|${b.v}|${FLAGGED.has(b.type) ? nationOf(b).color : ''}`; }
@@ -65,7 +65,7 @@ function finishBuilding(b, silent) {
     if (nationOf(b).ai) return;
     sfx('done');
     const d = BT[b.type]; if (d.c === 'lm') relieve(nationOf(b), 6);
-    if (d.cost >= 1e6 || d.c === 'lm') { toast(`${d.n} selesai dibangun`, nationOf(b).name, 'gold', 'sparkle'); addNews(`${d.n} resmi beroperasi di ${nationOf(b).name}.`); }
+    if (d.cost >= 1e6 || d.c === 'lm') { toast(`${d.n} completed`, nationOf(b).name, 'gold', 'sparkle'); addNews(`${d.n} is now open in ${nationOf(b).name}.`); }
   }
 }
 function removeBuilding(b) {
@@ -76,13 +76,13 @@ function removeBuilding(b) {
   S.blds.delete(b.id); S.dmgSet.delete(b); S.zoneDirty = true; const n = nationOf(b); const k = n.list.indexOf(b); if (k >= 0) n.list.splice(k, 1);
   markAllDirty(); if (S.selected && S.selected.b === b) closeInfo();
 }
-function upgradeCost(b) { return Math.round(BT[b.type].cost * LVC[b.level]); }
+function upgradeCost(b) { return Math.round(BT[b.type].cost * LVC[b.level] * priceNow(nationOf(b))); }
 function upgradeBuilding(b) {
   const d = BT[b.type], n = nationOf(b); if (b.level >= (d.lv || 1) || b.prog < 1 || b.dmg) return;
-  const c = upgradeCost(b); if (n.treasury < c) { toast('Dana tidak cukup', `Butuh ${money(c)}`, 'bad', 'alert'); sfx('error'); return; }
+  const c = upgradeCost(b); if (n.treasury < c) { toast('Not enough funds', `Need ${money(c)}`, 'bad', 'alert'); sfx('error'); return; }
   n.treasury -= c; b._pool.remove(b); S.emitters = S.emitters.filter(e => e.b !== b);
   b.level++; b.vis = 0.3; b.upg = true; attachVisual(b); S.building.push(b);
-  if (!n.ai) bump('up'); sfx('build'); markAllDirty(); addNews(`${d.n} ditingkatkan ke level ${b.level}.`);
+  if (!n.ai) bump('up'); sfx('build'); markAllDirty(); addNews(`${d.n} upgraded to level ${b.level}.`);
 }
 function animBuildings(dt) {
   const sp = S.paused ? 0 : S.speed;
@@ -114,7 +114,7 @@ function removeRoad(i) {
   const x = i % MAP, z = (i / MAP) | 0; for (const [dx, dz] of DIRS) if (inb(x + dx, z + dz)) refreshRoad(ix(x + dx, z + dz));
   markAllDirty(); carsDirty = true;
 }
-function roadCostAt(i) { const t = terr[i]; return t === T.DEEP ? BRIDGE_COST[0] : t === T.SHALLOW ? BRIDGE_COST[1] : ROAD_COST + (W.treeAt.has(i) ? 500 : 0); }
+function roadCostAt(i) { const t = terr[i]; return (t === T.DEEP ? BRIDGE_COST[0] : t === T.SHALLOW ? BRIDGE_COST[1] : ROAD_COST + (W.treeAt.has(i) ? 500 : 0)) * priceNow(); }
 function roadOK(i, n) { return owner[i] === n.id && terr[i] !== T.MTN && !tileB[i] && !road[i]; }
 
 /* ---------------- cars ---------------- */
@@ -132,7 +132,7 @@ function spawnCar(arr) { for (let t = 0; t < 12; t++) { const c = arr[Math.floor
 const cxw = i => i % MAP - HALF + 0.5, czw = i => ((i / MAP) | 0) - HALF + 0.5;
 function updateCars(dt) {
   if (carsDirty) {
-    carsDirty = false; const target = Math.min(CAR_CAP, Math.floor(S.roadSet.size * 0.3)); const arr = [...S.roadSet];
+    carsDirty = false; const target = Math.min(CAR_CAP, Math.floor(S.roadSet.size * 0.3 * (S.started ? trafficFactor() : 1))); const arr = [...S.roadSet];
     cars = cars.filter(k => road[k.c] && road[k.p] && road[k.n]); if (cars.length > target) cars.length = target;
     while (cars.length < target) { const k = spawnCar(arr); if (!k) break; cars.push(k); }
   }
@@ -192,7 +192,7 @@ function makeNation(o) {
     capital: { x: 0, z: 0 }, list: [], pop: 0, cap: 0, happy: 0.6, approval: 62, apprMod: 0, workers: 0, jobs: 0, employed: 0, fill: 0, unemp: 0,
     ps: 0, pd: 0, ws: 0, wd: 0, pr: 1, wr: 1, roads: 0, tiles: 0, rate: { inc: {}, exp: {}, net: 0 }, acc: { inc: {}, exp: {} }, last: null, hist: [],
     pol: {}, loans: [], ms: 0, trades: [], allied: false, rel: 50, dirty: true, radius: 12, founded: S.day, popM: 0,
-    dem: 0, debtM: 0, lowM: 0, coalUsed: 0, mods: [], pers: null, sanc: 0, cong: 0, imfDay: -9999
+    dem: 0, debtM: 0, lowM: 0, coalUsed: 0, mods: [], pers: null, sanc: 0, cong: 0, imfDay: -9999, P: 1, infl: 0.03, bud: { edu: 1, health: 1, safety: 1, infra: 1 }
   }, o);
 }
 function spotScore(cx, cz, r) {
@@ -260,7 +260,7 @@ function recalcNation(n) {
     const cv = { edu: 0, health: 0, safety: 0, fire: 0, park: 0, land: 0 }; let poll = 0; const rx = r.x + r.s / 2, rz = r.z + r.s / 2;
     for (const s of src) {
       const d = BT[s.type], dist = Math.hypot(s.x + s.s / 2 - rx, s.z + s.s / 2 - rz);
-      if (d.svc && dist <= d.r) cv[d.svc] = Math.max(cv[d.svc], Math.min(1, (1 - dist / d.r * 0.45) * (d.sv || 1)));
+      if (d.svc && dist <= d.r) cv[d.svc] = Math.max(cv[d.svc], Math.min(1, (1 - dist / d.r * 0.45) * (d.sv || 1) * budCov(n, d.svc)));
       if (d.hap && dist <= d.r) { const v = d.hap * (1 - dist / d.r * 0.5); if (d.c === 'lm' || d.c === 'gov') cv.land += v; else cv.park += v; }
       if (d.poll && dist < 8) poll += d.poll * (1 - dist / 8) * 0.022;
     }
@@ -272,10 +272,10 @@ const sumObj = o => Object.values(o || {}).reduce((a, b) => a + b, 0);
 function simNation(n) {
   if (n.dirty) recalcNation(n);
   const M = natMods(n);
-  let ps = 0, pd = 0, ws = 0, wd = 0, jobs = 0;
+  let ps = 0, pd = 0, ws = 0, wd = 0, jobs = 0, tcap = 0; const wx = wxNow();
   for (const b of n.list) {
     if (b.prog < 1) continue; const d = BT[b.type]; b.active = (d.road === false || b.conn) && !b.dmg; if (!b.active) continue;
-    const lu = LVU[b.level - 1]; ps += d.pgen || 0; ws += d.wgen || 0; pd += (d.pw || 0) * lu; wd += (d.wt || 0) * lu; jobs += jobsOf(b);
+    const lu = LVU[b.level - 1]; ps += (d.pgen || 0) * (b.type === 'solar' ? wx.solar : b.type === 'wind' ? (wx.wind || 1) : 1); tcap += d.tcap || 0; ws += d.wgen || 0; pd += (d.pw || 0) * lu; wd += (d.wt || 0) * lu; jobs += jobsOf(b);
   }
   const pr = pd > 0 ? Math.min(1, ps / pd) : 1, wr = wd > 0 ? Math.min(1, ws / wd) : 1;
   Object.assign(n, { ps, pd, ws, wd, pr, wr });
@@ -299,18 +299,19 @@ function simNation(n) {
   }
   n.pop = pop; n.cap = cap; n.happy = pop > 0 ? hs / pop : 0.5;
   n.workers = pop * 0.55; n.jobs = jobs; n.employed = Math.min(n.workers, jobs); const fill = jobs > 0 ? n.employed / jobs : 0; n.fill = fill;
-  n.cong = n.roads > 0 ? n.employed / (n.roads * 220 * (n.pol.transit ? 2 : 1)) : 0;
+  const roadCap = n.roads * 220 * (n.pol.transit ? 2 : 1) * (0.75 + 0.25 * budOf(n, 'infra')) + tcap;
+  n.cong = roadCap > 0 ? n.employed / roadCap : 0;
   const tf = n.tax / 10; let com = 0, ind = 0, tour = 0, trade = 0, upk = 0, air = false, appr = 0;
   for (const b of n.list) {
-    const d = BT[b.type]; if (b.prog < 1) continue; upk += (d.up || 0) * LVU[b.level - 1]; if (!b.active) continue;
+    const d = BT[b.type]; if (b.prog < 1) continue; upk += (d.up || 0) * LVU[b.level - 1] * budUpk(n, d); if (!b.active) continue;
     if (d.rev) { const r = jobsOf(b) * fill * d.rev * tf * (0.4 + 0.6 * pr) * (n.pol.sez ? 1.2 : 1); if (d.c === 'ind') ind += r; else com += r; }
     if (d.tour) tour += d.tour; if (d.trade) trade += d.trade; if (d.tourm) air = true; if (d.appr) appr += d.appr;
   }
   com *= M.com; ind *= M.ind;
   tour *= (0.6 + n.happy * 0.8) * (air ? 1.5 : 1) * (n.pol.tour ? 1.4 : 1) * M.tour;
   for (const id of n.trades) { const a = S.nations[id]; if (a) trade += Math.sqrt(Math.max(1, n.pop) * Math.max(1, a.pop)) * 9 * ((a.allied || n.allied) ? 1.3 : 1); }
-  trade *= M.trade; upk = (upk + n.roads * 25) * M.upk;
-  let polc = 0; for (const k in n.pol) if (n.pol[k]) polc += POL[k].cost(n);
+  trade *= M.trade; upk = (upk + n.roads * 25 * budOf(n, 'infra')) * M.upk;
+  let polc = 0; for (const k in n.pol) if (n.pol[k]) polc += POL[k].cost(n); polc *= priceNow(n);
   let loan = 0; for (const L of n.loans) loan += L.pay;
   const taxI = taxBase * 3.5 * n.tax * M.tax;
   const inc = { tax: taxI, com, ind, tour, trade }, exp = { upk, pol: polc, loan };
@@ -321,13 +322,13 @@ function simNation(n) {
   n.approval += (tgtA - n.approval) * 0.035; n.apprMod *= 0.993;
   if (!n.ai && n.id === S.active && S.started && S.day > 3) {
     const lp = n.pr < 0.999, lw = n.wr < 0.999;
-    if (lp && !n.wP) toast('Listrik tidak cukup!', 'Bangun Ladang Surya, Turbin Angin atau PLTU', 'wa', 'bolt'); n.wP = lp;
-    if (lw && !n.wW) toast('Air bersih tidak cukup!', 'Bangun Menara Air atau Instalasi Air', 'wa', 'drop'); n.wW = lw;
+    if (lp && !n.wP) toast('Power shortage!', 'Build a Solar Farm, Wind Turbine or Coal Plant', 'wa', 'bolt'); n.wP = lp;
+    if (lw && !n.wW) toast('Water shortage!', 'Build a Water Tower or Water Treatment Plant', 'wa', 'drop'); n.wW = lw;
   }
   if (!n.ai) {
     while (n.ms < MILESTONES.length && n.pop >= MILESTONES[n.ms][0]) {
       const [p, g] = MILESTONES[n.ms++]; n.treasury += g; relieve(n, 10);
-      toast(`Tonggak ${fmtPop(p)} penduduk!`, `Hibah pembangunan ${money(g)} · bangunan baru terbuka`, 'gold', 'sparkle'); sfx('coin'); addNews(`${n.name} mencapai ${fmtPop(p)} penduduk.`);
+      toast(`Milestone: ${fmtPop(p)} population!`, `Development grant ${money(g)} · new buildings unlocked`, 'gold', 'sparkle'); sfx('coin'); addNews(`${n.name} reached a population of ${fmtPop(p)}.`);
       if (n.id === S.active) refreshDrawer();
     }
   }
@@ -347,7 +348,7 @@ function monthEnd() {
     for (const L of n.loans) L.left--; n.loans = n.loans.filter(L => L.left > 0);
     if (n.ai) { if (n.trades.length) n.rel = Math.min(100, n.rel + 0.4); n.rel += (persOf(n).rel - n.rel) * 0.01; if (m % persOf(n).exp === 0) aiExpand(n); }
     else {
-      if (n.treasury < 0 && m % 2 === 0 && n.id === S.active) toast('Kas negara defisit!', 'Naikkan pajak, kurangi biaya, atau ambil pinjaman', 'bad', 'alert');
+      if (n.treasury < 0 && m % 2 === 0 && n.id === S.active) toast('Treasury in deficit!', 'Raise taxes, cut costs, or take out a loan', 'bad', 'alert');
       const age = m - Math.floor(n.founded / 30); if (age > 0 && age % 60 === 0) election(n);
     }
   }
@@ -361,14 +362,14 @@ function election(n) {
   // Career rules: a lost vote can be rescued by a coalition only on easy, or once (normal) when the margin is small.
   const rescue = !win && (!career() || D.coal >= 99 || (share >= 40 && (n.coalUsed || 0) < D.coal));
   const lost = !win && !rescue;
-  const html = `<p>Rakyat <b>${esc(n.name)}</b> telah memberikan suaranya dalam Pemilihan Umum.</p>
-  <div class="grid2" style="margin-top:14px"><div class="box"><div class="lb">Suara untukmu</div><div class="vl ${win ? 'up' : 'dn'}">${share.toFixed(1).replace('.', ',')}%</div></div><div class="box"><div class="lb">Oposisi</div><div class="vl">${(100 - share).toFixed(1).replace('.', ',')}%</div></div></div>
-  <p style="margin-top:14px">${win ? 'Selamat! Kamu terpilih kembali untuk periode 5 tahun berikutnya. Kepercayaan rakyat meningkat.'
-      : rescue ? `Kamu kalah tipis — tapi koalisi parlemen menyelamatkan jabatanmu dengan syarat: dana kampanye 10% kas dibayarkan & program reformasi.${career() && D.coal < 99 ? ' <b>Koalisi darurat hanya bisa terjadi sekali.</b>' : ''}`
-      : 'Oposisi menang telak. Tidak ada koalisi yang mau menyelamatkanmu.'}</p>`;
+  const html = `<p>The people of <b>${esc(n.name)}</b> have cast their votes in the general election.</p>
+  <div class="grid2" style="margin-top:14px"><div class="box"><div class="lb">Your vote share</div><div class="vl ${win ? 'up' : 'dn'}">${share.toFixed(1)}%</div></div><div class="box"><div class="lb">Opposition</div><div class="vl">${(100 - share).toFixed(1)}%</div></div></div>
+  <p style="margin-top:14px">${win ? 'Congratulations! You have been re-elected for another 5-year term. Public trust is rising.'
+      : rescue ? `You narrowly lost — but a parliamentary coalition saved your office, on conditions: 10% of the Treasury paid as campaign funds & a reform agenda.${career() && D.coal < 99 ? ' <b>An emergency coalition can only happen once.</b>' : ''}`
+      : 'The opposition won in a landslide. No coalition is willing to save you.'}</p>`;
   if (win) { n.apprMod += 6; } else if (rescue) { n.treasury -= Math.max(0, n.treasury * 0.1); n.approval = 50; n.coalUsed = (n.coalUsed || 0) + 1; }
-  addNews(`Pemilu ${n.name}: ${win ? 'Presiden terpilih kembali' : rescue ? 'koalisi darurat terbentuk' : 'oposisi menang'} (${share.toFixed(1)}%).`);
-  queueModal(() => modal({ title: win ? 'Terpilih Kembali!' : 'Hasil Pemilu', sub: `Pemilu ${esc(n.name)}`, icon: 'vote', html, buttons: [{ l: 'Lanjutkan', pri: 1 }] }));
+  addNews(`${n.name} Election: ${win ? 'President re-elected' : rescue ? 'emergency coalition formed' : 'opposition wins'} (${share.toFixed(1)}%).`);
+  queueModal(() => modal({ title: win ? 'Re-elected!' : 'Election Results', sub: `${esc(n.name)} Election`, icon: 'vote', html, buttons: [{ l: 'Continue', pri: 1 }] }));
   if (lost) nationFails(n, 'election');
 }
 

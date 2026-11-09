@@ -4,19 +4,19 @@
 
 /* ---------------- zoning (private development) ---------------- */
 const ZONES = {
-  1: { n: 'Zona Hunian', c: '#34d399', icon: 'home', d: 'Rumah & apartemen', dm: 0 },
-  2: { n: 'Zona Bisnis', c: '#60a5fa', icon: 'shop', d: 'Ruko & perkantoran', dm: 1 },
-  3: { n: 'Zona Industri', c: '#fbbf24', icon: 'factory', d: 'Tani & pabrik · 2×2', dm: 2 },
+  1: { n: 'Residential Zone', c: '#34d399', icon: 'home', d: 'Houses & apartments', dm: 0 },
+  2: { n: 'Commercial Zone', c: '#60a5fa', icon: 'shop', d: 'Shophouses & offices', dm: 1 },
+  3: { n: 'Industrial Zone', c: '#fbbf24', icon: 'factory', d: 'Farms & factories · 2×2', dm: 2 },
 };
-const ZONE_FEE = 250, DEV_SHARE = 0.5;             // biaya izin per petak · porsi biaya yang ditanggung negara
+const ZONE_FEE = 250, DEV_SHARE = 0.5;             // permit fee per tile · share of the cost paid by the state
 const zoneOK = (i, n) => owner[i] === n.id && terr[i] >= 2 && terr[i] !== T.MTN && !road[i] && !tileB[i];
 function paintZoneTiles(L, z, n) {
   if (z === 0) { let c = 0; for (const i of L) if (owner[i] === n.id && zone[i]) { zone[i] = 0; c++; } S.zoneDirty = true; return { c, cost: 0 }; }
   const ok = L.filter(i => zoneOK(i, n) && zone[i] !== z), cost = ok.length * ZONE_FEE;
   if (!ok.length) return { c: 0, cost: 0 };
-  if (n.treasury < cost) { toast('Dana tidak cukup', `Izin zonasi ${money(cost)}`, 'bad', 'alert'); sfx('error'); return { c: 0, cost: 0 }; }
+  if (n.treasury < cost) { toast('Not enough funds', `Zoning permits cost ${money(cost)}`, 'bad', 'alert'); sfx('error'); return { c: 0, cost: 0 }; }
   n.treasury -= cost; for (const i of ok) zone[i] = z; S.zoneDirty = true; sfx('build');
-  if (!S.cnt.zoneTip) { S.cnt.zoneTip = 1; toast('Zona ditetapkan', 'Swasta membangun otomatis di petak yang menempel jalan, sesuai permintaan H/B/I', 'info', 'zone'); }
+  if (!S.cnt.zoneTip) { S.cnt.zoneTip = 1; toast('Zone designated', 'Private developers build automatically on road-adjacent tiles, following R/C/I demand', 'info', 'zone'); }
   return { c: ok.length, cost };
 }
 let zoneMesh = null; const _zc = new THREE.Color();
@@ -66,8 +66,8 @@ function zoneDev(n) {
       let t2 = type, site = devSite(type, i, z, n);
       if (!site && type !== basic) { t2 = basic; site = devSite(basic, i, z, n); }
       if (!site) continue;
-      const cost = siteCost(t2, site.x, site.z) * DEV_SHARE;
-      if (n.treasury < cost) { if (!n.devWarn && n.id === S.active) { n.devWarn = 1; toast('Pembangunan swasta tertunda', 'Kas tidak cukup untuk insentif 50%', 'wa', 'zone'); } return; }
+      const cost = siteCost(t2, site.x, site.z, n) * DEV_SHARE;
+      if (n.treasury < cost) { if (!n.devWarn && n.id === S.active) { n.devWarn = 1; toast('Private development on hold', 'Not enough in the Treasury for the 50% incentive', 'wa', 'zone'); } return; }
       n.devWarn = 0; n.treasury -= cost; placeBuilding(t2, site.x, site.z, n, {}); bumpB(t2); k--;
     }
   }
@@ -85,7 +85,7 @@ function autoUpgrade(n) {
   const c = n.list.filter(b => b.prog >= 1 && b.vis >= 1 && !b.dmg && b.level < (BT[b.type].lv || 1) && upgradeReady(b, n)).sort((a, b) => upgradeCost(a) - upgradeCost(b));
   let done = 0, spent = 0;
   for (const b of c) { if (done >= 6) break; const cost = upgradeCost(b); if (n.treasury - cost < reserve) break; n.treasury -= cost; spent += cost; quietUpgrade(b); bump('up'); done++; }
-  if (done && n.id === S.active) toast('Peremajaan kota', `${done} bangunan ditingkatkan · −${money(spent)}`, 'info', 'up');
+  if (done && n.id === S.active) toast('City renewal', `${done} buildings upgraded · −${money(spent)}`, 'info', 'up');
 }
 
 /* ---------------- land value ---------------- */
@@ -99,11 +99,11 @@ function landValue(r) {
   const v = 0.22 + cv.edu * 0.14 + cv.health * 0.12 + cv.safety * 0.1 + cv.fire * 0.05 + Math.min(0.2, cv.park * 1.4) + Math.min(0.22, cv.land * 1.6) - r.poll * 1.1 + (nearWater(r) ? 0.08 : 0);
   return clamp(v, 0, 1);
 }
-const lvLabel = v => v >= 0.7 ? 'Tinggi' : v >= 0.45 ? 'Sedang' : 'Rendah';
+const lvLabel = v => v >= 0.7 ? 'High' : v >= 0.45 ? 'Medium' : 'Low';
 
 /* ---------------- disasters ---------------- */
 const DMGC = new THREE.Color('#6b5548');
-const repairCost = b => Math.round(BT[b.type].cost * 0.3 * LVM[b.level - 1] / 1000) * 1000;
+const repairCost = b => Math.round(BT[b.type].cost * 0.3 * LVM[b.level - 1] * priceNow(nationOf(b)) / 1000) * 1000;
 function addDmgFx(b) { if (S.emitters.some(e => e.b === b && e.dmg)) return; const [x, z] = rotLocal(b, 0, 0); S.emitters.push({ b, x, y: 0.9, z, k: 0, acc: Math.random(), dmg: true }); }
 function damageB(b, days) {
   if (!S.blds.has(b.id) || b.type === 'palace') return;
@@ -129,16 +129,16 @@ function fireCover(b, n) {
 }
 function floodDamage(n, days) { let k = 0; for (const b of n.list) if (b.prog >= 1 && !b.dmg && nearWater(b) && b.type !== 'palace' && Math.random() < 0.55 && k < 14) { damageB(b, days + Math.floor(Math.random() * 4)); k++; } return k; }
 const DISASTERS = [
-  { id: 'fire', n: 'Kebakaran', i: 'flame', w: 4, c: n => n.list.some(b => ['res', 'com', 'ind'].includes(BT[b.type].c) && b.prog >= 1) },
-  { id: 'quake', n: 'Gempa Bumi', i: 'quake', w: 1.4, c: n => n.list.length > 20 },
-  { id: 'flood', n: 'Banjir Rob', i: 'drop', w: 2, c: n => n.list.some(b => b.prog >= 1 && nearWater(b) && b.type !== 'palace') },
-  { id: 'storm', n: 'Badai Besar', i: 'wind', w: 1.5, c: n => n.list.some(b => (b.type === 'wind' || b.type === 'solar') && b.prog >= 1) },
+  { id: 'fire', n: 'Fire', i: 'flame', w: 4, c: n => n.list.some(b => ['res', 'com', 'ind'].includes(BT[b.type].c) && b.prog >= 1) },
+  { id: 'quake', n: 'Earthquake', i: 'quake', w: 1.4, c: n => n.list.length > 20 },
+  { id: 'flood', n: 'Coastal Flood', i: 'drop', w: 2, c: n => n.list.some(b => b.prog >= 1 && nearWater(b) && b.type !== 'palace') },
+  { id: 'storm', n: 'Severe Storm', i: 'wind', w: 1.5, c: n => n.list.some(b => (b.type === 'wind' || b.type === 'solar') && b.prog >= 1) },
 ];
 function disasterRoll(n) {
   if (!S.disasters || n.ai || S.over || S.day < 180 || Math.random() > 0.055 * dif().dis) return;
   const pool = DISASTERS.filter(d => d.c(n)); if (!pool.length) return;
-  let r = Math.random() * pool.reduce((a, d) => a + d.w, 0), D = pool[0];
-  for (const d of pool) { r -= d.w; if (r <= 0) { D = d; break; } }
+  let r = Math.random() * pool.reduce((a, d) => a + d.w * seasonW(d.id), 0), D = pool[0];
+  for (const d of pool) { r -= d.w * seasonW(d.id); if (r <= 0) { D = d; break; } }
   runDisaster(D, n);
 }
 function runDisaster(D, n) {
@@ -163,14 +163,14 @@ function runDisaster(D, n) {
   }
   if (!hit.length && !destroyed) return;
   const fx = focus ? { x: focus.x, z: focus.z } : n.capital;
-  addNews(`${D.n} melanda ${n.name}: ${hit.length} bangunan rusak${destroyed ? `, ${destroyed} hancur` : ''}.`); sfx('error');
+  addNews(`${D.n} hits ${n.name}: ${hit.length} buildings damaged${destroyed ? `, ${destroyed} destroyed` : ''}.`); sfx('error');
   const fixAll = () => { const L = [...S.dmgSet].filter(b => b.nid === n.id), c = L.reduce((a, b) => a + repairCost(b), 0); return { L, c }; };
   queueModal(() => {
     const { L, c } = fixAll();
     modal({
       title: `${D.n}!`, sub: `${esc(n.name)} · ${dateStr(S.day)}`, icon: D.i,
-      html: `<p>${D.id === 'fire' ? 'Api melalap bangunan di kota.' : D.id === 'quake' ? 'Gempa mengguncang wilayahmu.' : D.id === 'flood' ? 'Air laut pasang merendam kawasan pesisir.' : 'Angin kencang merusak pembangkit listrik.'} <b>${hit.length}</b> bangunan rusak${destroyed ? ` dan <b>${destroyed}</b> hancur` : ''}.</p><p class="ms" style="margin-top:6px">Bangunan rusak tidak beroperasi sampai pulih otomatis. ${D.id === 'fire' ? 'Cakupan Pemadam Kebakaran mengurangi kerugian.' : ''} ${bn ? 'BNPB mempercepat pemulihan.' : 'Program BNPB (Kebijakan) mengurangi kerusakan & mempercepat pemulihan.'}</p>`,
-      buttons: [{ l: `${ico('map')} Lihat lokasi`, f: () => { flyTo(fx.x, fx.z, 30); } }, ...(L.length ? [{ l: `${ico('wrench')} Perbaiki semua · ${money(c)}`, pri: 1, f: () => { if (n.treasury < c) { toast('Dana tidak cukup', `Butuh ${money(c)}`, 'bad', 'alert'); return; } n.treasury -= c; for (const b of L) repairB(b); toast('Perbaikan selesai', `${L.length} bangunan kembali beroperasi`, 'info', 'wrench'); } }] : []), { l: 'Tutup' }]
+      html: `<p>${D.id === 'fire' ? 'Fire tears through buildings in the city.' : D.id === 'quake' ? 'An earthquake shakes your territory.' : D.id === 'flood' ? 'A high tide floods the coastal districts.' : 'Strong winds damage your power plants.'} <b>${hit.length}</b> buildings damaged${destroyed ? ` and <b>${destroyed}</b> destroyed` : ''}.</p><p class="ms" style="margin-top:6px">Damaged buildings stay out of service until they recover on their own. ${D.id === 'fire' ? 'Fire Station coverage reduces losses.' : ''} ${bn ? 'The Disaster Management Agency speeds up recovery.' : 'The Disaster Management Agency program (Policy) reduces damage and speeds up recovery.'}</p>`,
+      buttons: [{ l: `${ico('map')} View location`, f: () => { flyTo(fx.x, fx.z, 30); } }, ...(L.length ? [{ l: `${ico('wrench')} Repair all · ${money(c)}`, pri: 1, f: () => { if (n.treasury < c) { toast('Not enough funds', `Requires ${money(c)}`, 'bad', 'alert'); return; } n.treasury -= c; for (const b of L) repairB(b); toast('Repairs complete', `${L.length} buildings back in service`, 'info', 'wrench'); } }] : []), { l: 'Close' }]
     });
   });
 }
@@ -208,7 +208,7 @@ function musBar(t) {
 }
 
 /* ---------------- graphics quality ---------------- */
-const GFX = { high: { n: 'Tinggi', pr: 2, sh: 2048 }, med: { n: 'Sedang', pr: 1.5, sh: 1024 }, low: { n: 'Rendah', pr: 1, sh: 0 } };
+const GFX = { high: { n: 'High', pr: 2, sh: 2048 }, med: { n: 'Medium', pr: 1.5, sh: 1024 }, low: { n: 'Low', pr: 1, sh: 0 } };
 function gfxDefault() {
   const touch = matchMedia('(pointer:coarse)').matches, small = Math.min(screen.width, screen.height) < 820;
   const weak = (navigator.deviceMemory || 8) <= 4 || (navigator.hardwareConcurrency || 8) <= 4;
@@ -226,11 +226,11 @@ function initGfx() { let q = null; try { q = localStorage.getItem('sovereign_gfx
 /* ---------------- save export / import ---------------- */
 function exportSave() {
   saveGame(true); let s = null; try { s = localStorage.getItem(SAVE_KEY); } catch (e) { }
-  if (!s) { toast('Belum ada simpanan', 'Mulai bermain dulu', 'bad', 'alert'); return; }
-  const n = homeN(), name = (n ? n.name : 'sovereign').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'negara';
+  if (!s) { toast('No save yet', 'Start playing first', 'bad', 'alert'); return; }
+  const n = homeN(), name = (n ? n.name : 'sovereign').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'nation';
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([s], { type: 'application/json' }));
-  a.download = `sovereign-${name}-tahun-${Math.floor(S.day / 360) + 1}.json`; document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 2000); toast('Simpanan diekspor', 'Simpan file .json ini untuk dimainkan di perangkat lain', 'info', 'download');
+  a.download = `sovereign-${name}-year-${Math.floor(S.day / 360) + 1}.json`; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000); toast('Save exported', 'Keep this .json file to continue on another device', 'info', 'download');
 }
 const validSave = d => !!(d && typeof d.seed === 'number' && Array.isArray(d.nations) && d.nations.length && Array.isArray(d.blds) && Array.isArray(d.owner) && Array.isArray(d.roads));
 function importSave() {
@@ -239,9 +239,9 @@ function importSave() {
     const f = inp.files && inp.files[0]; if (!f) return;
     f.text().then(t => {
       let d = null; try { d = JSON.parse(t); } catch (e) { }
-      if (!validSave(d)) { if (S.started) toast('File tidak valid', 'Pilih file simpanan SOVEREIGN (.json)', 'bad', 'alert'); else modal({ title: 'File tidak valid', sub: 'Pilih file simpanan SOVEREIGN (.json)', icon: 'alert', buttons: [{ l: 'Oke', pri: 1 }] }); return; }
+      if (!validSave(d)) { if (S.started) toast('Invalid file', 'Choose a SOVEREIGN save file (.json)', 'bad', 'alert'); else modal({ title: 'Invalid file', sub: 'Choose a SOVEREIGN save file (.json)', icon: 'alert', buttons: [{ l: 'OK', pri: 1 }] }); return; }
       const nm = d.nations[d.active || 0]?.name || '';
-      modal({ title: 'Impor simpanan?', sub: `${esc(nm)} · ${dateStr(d.day || 0)}`, icon: 'upload', html: '<p>Simpanan di browser ini akan diganti dengan file yang dipilih, lalu permainan dimuat ulang.</p>', buttons: [{ l: 'Batal' }, { l: `${ico('upload')} Impor & muat`, pri: 1, f: () => { try { localStorage.setItem(SAVE_KEY, t); location.reload(); } catch (e) { modal({ title: 'Gagal mengimpor', sub: 'Penyimpanan browser tidak tersedia', icon: 'alert', buttons: [{ l: 'Oke', pri: 1 }] }); } } }] });
+      modal({ title: 'Import save?', sub: `${esc(nm)} · ${dateStr(d.day || 0)}`, icon: 'upload', html: '<p>The save in this browser will be replaced by the selected file, and the game will reload.</p>', buttons: [{ l: 'Cancel' }, { l: `${ico('upload')} Import & load`, pri: 1, f: () => { try { localStorage.setItem(SAVE_KEY, t); location.reload(); } catch (e) { modal({ title: 'Import failed', sub: 'Browser storage is unavailable', icon: 'alert', buttons: [{ l: 'OK', pri: 1 }] }); } } }] });
     });
   };
   inp.click();
@@ -250,38 +250,40 @@ function importSave() {
 /* ---------------- status chips · goals · approval breakdown ---------------- */
 function apprParts(n) {
   const M = natMods(n), parts = [
-    ['Kebahagiaan warga', n.happy * 64], ['Lapangan kerja', (1 - n.unemp) * 22], [n.treasury >= 0 ? 'Kas sehat' : 'Kas defisit', n.treasury >= 0 ? 10 : -12],
-    ['Gedung (parlemen, militer)', n.list.reduce((a, b) => a + (b.prog >= 1 && (b.active || BT[b.type].road === false) ? BT[b.type].appr || 0 : 0), 0)],
-    ['Aliansi', n.allied ? 2 : 0], ['Keputusan & peristiwa', n.apprMod], ['Kebijakan & efek aktif', M.appr], ['Tuntutan rakyat', -(n.dem || 0)],
+    ['Citizen happiness', n.happy * 64], ['Employment', (1 - n.unemp) * 22], [n.treasury >= 0 ? 'Healthy treasury' : 'Treasury in deficit', n.treasury >= 0 ? 10 : -12],
+    ['Buildings (parliament, military)', n.list.reduce((a, b) => a + (b.prog >= 1 && (b.active || BT[b.type].road === false) ? BT[b.type].appr || 0 : 0), 0)],
+    ['Alliance', n.allied ? 2 : 0], ['Decisions & events', n.apprMod], ['Policies & active effects', M.appr], ['Public demand', -(n.dem || 0)],
   ];
   return parts.filter(p => Math.abs(p[1]) >= 0.5);
 }
 function demandModal() {
   const n = act();
   modal({
-    title: 'Tuntutan Rakyat', sub: `${esc(n.name)} · ${Math.round(n.dem || 0)} / ${dif().demMax}`, icon: 'users',
-    html: `<p>Rakyat menuntut kemajuan. Setiap bulan tuntutan naik <b>${String(dif().dem).replace('.', ',')}</b> poin (${dif().n}) dan langsung mengurangi approval (maksimal ${dif().demMax}). Lajunya melambat saat negaramu makin besar.</p>
-      <div class="lst" style="margin-top:10px"><div class="kv"><span>Penduduk tumbuh 1%/bulan</span><span class="up">−3 poin</span></div><div class="kv"><span>Program kerja tuntas</span><span class="up">−3 poin</span></div><div class="kv"><span>Bab program kerja selesai</span><span class="up">−8 poin</span></div><div class="kv"><span>Landmark selesai dibangun</span><span class="up">−6 poin</span></div><div class="kv"><span>Tonggak penduduk tercapai</span><span class="up">−10 poin</span></div></div>
-      <p class="ms" style="margin-top:10px">Diam saja = approval perlahan anjlok. Approval rendah bisa berujung pemakzulan atau kalah pemilu.</p>`,
-    buttons: [{ l: 'Mengerti', pri: 1 }]
+    title: 'Public Demand', sub: `${esc(n.name)} · ${Math.round(n.dem || 0)} / ${dif().demMax}`, icon: 'users',
+    html: `<p>The people demand progress. Every month, demand rises by <b>${dif().dem}</b> points (${dif().n}) and directly reduces approval (up to ${dif().demMax}). It rises more slowly as your nation grows.</p>
+      <div class="lst" style="margin-top:10px"><div class="kv"><span>Population grows 1%/month</span><span class="up">−3 points</span></div><div class="kv"><span>Agenda item completed</span><span class="up">−3 points</span></div><div class="kv"><span>Agenda chapter completed</span><span class="up">−8 points</span></div><div class="kv"><span>Landmark completed</span><span class="up">−6 points</span></div><div class="kv"><span>Population milestone reached</span><span class="up">−10 points</span></div></div>
+      <p class="ms" style="margin-top:10px">Stand still and approval slowly sinks. Low approval can lead to impeachment or an election defeat.</p>`,
+    buttons: [{ l: 'Got it', pri: 1 }]
   });
 }
 function renderChips() {
   let el = $('#gchips'); if (!el) { el = document.createElement('div'); el.id = 'gchips'; $('#hud').appendChild(el); }
   const n = act(); if (!n) return; const D = dif(), ch = [];
-  ch.push(`<button class="gc" data-g="goal">${ico(career() ? 'trophy' : 'sparkle')}${career() ? 'Karier' : 'Bebas'} · ${D.n}</button>`);
-  if (career() && (n.dem || 0) >= 5) ch.push(`<button class="gc ${n.dem >= 25 ? 'bad' : 'wa'}" data-g="dem">${ico('users')}Tuntutan rakyat ${Math.round(n.dem)}</button>`);
-  if (career() && n.debtM) ch.push(`<button class="gc bad" data-g="pol">${ico('coins')}Defisit ${n.debtM}/${D.crisis} bln</button>`);
-  if (career() && n.lowM) ch.push(`<button class="gc bad" data-g="goal">${ico('alert')}Mosi tidak percaya ${n.lowM}/6</button>`);
+  ch.push(`<button class="gc" data-g="goal">${ico(career() ? 'trophy' : 'sparkle')}${career() ? 'Career' : 'Sandbox'} · ${D.n}</button>`);
+  ch.push(wxChip());
+  if (career() && (n.dem || 0) >= 5) ch.push(`<button class="gc ${n.dem >= 25 ? 'bad' : 'wa'}" data-g="dem">${ico('users')}Public demand ${Math.round(n.dem)}</button>`);
+  if (career() && n.debtM) ch.push(`<button class="gc bad" data-g="pol">${ico('coins')}Deficit ${n.debtM}/${D.crisis} mo</button>`);
+  if (career() && n.lowM) ch.push(`<button class="gc bad" data-g="goal">${ico('alert')}No-confidence ${n.lowM}/6</button>`);
   const threats = (n.mods || []).filter(m => m.id.startsWith('tarif') || m.id.startsWith('sanksi'));
-  if (threats.length) ch.push(`<button class="gc wa" data-g="diplo">${ico('globe')}${threats.length > 1 ? threats.length + ' sanksi/tarif' : esc(threats[0].t)} · ${threats[0].left} bln</button>`);
+  if (threats.length) ch.push(`<button class="gc wa" data-g="diplo">${ico('globe')}${threats.length > 1 ? threats.length + ' sanctions/tariffs' : esc(threats[0].t)} · ${threats[0].left} mo</button>`);
   const dmg = [...S.dmgSet].filter(b => b.nid === n.id).length;
-  if (dmg) ch.push(`<button class="gc wa" data-g="dmg">${ico('flame')}${dmg} bangunan rusak</button>`);
+  if (dmg) ch.push(`<button class="gc wa" data-g="dmg">${ico('flame')}${dmg} damaged buildings</button>`);
   const html = ch.join('');
   if (el._h === html) return; el._h = html; el.innerHTML = html;
   el.querySelectorAll('[data-g]').forEach(b => b.onclick = () => {
     sfx('click'); const g = b.dataset.g;
-    if (g === 'goal') openStats('goal'); else if (g === 'dem') demandModal(); else if (g === 'pol') openPolicy(); else if (g === 'diplo') openDiplo();
+    if (g === 'wx') weatherModal();
+    else if (g === 'goal') openStats('goal'); else if (g === 'dem') demandModal(); else if (g === 'pol') openPolicy(); else if (g === 'diplo') openDiplo();
     else if (g === 'dmg') { const d = [...S.dmgSet].find(x => x.nid === n.id); if (d) { flyTo(d.x, d.z, 28); select({ b: d }); } }
   });
 }

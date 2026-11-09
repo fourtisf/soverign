@@ -5,13 +5,13 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.m
    ===================================================================== */
 const MAP = 160, HALF = MAP / 2, DAY_SEC = 0.8, SAVE_KEY = 'sovereign_save_v1', MAX_PLAYER_NATIONS = 5;
 const T = { DEEP: 0, SHALLOW: 1, SAND: 2, GRASS: 3, FOREST: 4, HILL: 5, MTN: 6 };
-const TNAME = ['Laut Dalam', 'Perairan Dangkal', 'Pantai', 'Padang Rumput', 'Hutan', 'Perbukitan', 'Pegunungan'];
+const TNAME = ['Deep Sea', 'Shallow Water', 'Beach', 'Grassland', 'Forest', 'Hills', 'Mountains'];
 const ix = (x, z) => z * MAP + x, inb = (x, z) => x >= 0 && z >= 0 && x < MAP && z < MAP;
 const clamp = (v, a, b) => v < a ? a : v > b ? b : v, lerp = (a, b, t) => a + (b - a) * t;
 const smooth = (a, b, v) => { const t = clamp((v - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 const DIRS = [[0, -1], [1, 0], [0, 1], [-1, 0]];
 const $ = s => document.querySelector(s);
-const MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const NCOLORS = ['#22d3ee', '#34d399', '#3b82f6', '#8b5cf6', '#f43f5e', '#fb923c', '#a3e635', '#ec4899', '#14b8a6', '#facc15'];
 
 function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -33,12 +33,12 @@ function makeNoise(rand) {
 }
 function fmt(n) {
   const a = Math.abs(n), s = n < 0 ? '-' : ''; let v, u;
-  if (a >= 1e12) { v = a / 1e12; u = ' T'; } else if (a >= 1e9) { v = a / 1e9; u = ' M'; } else if (a >= 1e6) { v = a / 1e6; u = ' jt'; } else if (a >= 1e3) { v = a / 1e3; u = ' rb'; } else { v = a; u = ''; }
+  if (a >= 1e12) { v = a / 1e12; u = 'T'; } else if (a >= 1e9) { v = a / 1e9; u = 'B'; } else if (a >= 1e6) { v = a / 1e6; u = 'M'; } else if (a >= 1e3) { v = a / 1e3; u = 'K'; } else { v = a; u = ''; }
   const d = (u === '' || v >= 100) ? 0 : v >= 10 ? 1 : 2;
-  return s + v.toFixed(d).replace('.', ',') + u;
+  return s + v.toFixed(d) + u;
 }
 const money = n => (n < 0 ? '-$' : '$') + fmt(Math.abs(n));
-const fmtPop = n => Math.round(n).toLocaleString('id-ID');
+const fmtPop = n => Math.round(n).toLocaleString('en-US');
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const _C = new Map();
 function C(hex) { let v = _C.get(hex); if (!v) { const c = new THREE.Color(hex); v = [c.r, c.g, c.b]; _C.set(hex, v); } return v; }
@@ -107,84 +107,85 @@ function flagSVG(n) {
 
 /* ---------------- building catalogue ---------------- */
 const CATS = [
-  { id: 'select', name: 'Pilih & Inspeksi', icon: 'cursor', key: 'V' },
-  { id: 'road', name: 'Jalan & Jembatan', icon: 'road', key: '1' },
-  { id: 'res', name: 'Perumahan', icon: 'home', key: '2' },
-  { id: 'com', name: 'Komersial', icon: 'shop', key: '3' },
-  { id: 'ind', name: 'Industri', icon: 'factory', key: '4' },
-  { id: 'util', name: 'Energi & Air', icon: 'bolt', key: '5' },
-  { id: 'svc', name: 'Layanan Publik', icon: 'shield', key: '6' },
-  { id: 'rec', name: 'Taman & Rekreasi', icon: 'tree', key: '7' },
-  { id: 'gov', name: 'Pemerintahan & Strategis', icon: 'gov', key: '8' },
-  { id: 'lm', name: 'Landmark Nasional', icon: 'star', key: '9' },
-  { id: 'zone', name: 'Zonasi · swasta membangun', icon: 'zone', key: 'Z' },
+  { id: 'select', name: 'Select & Inspect', icon: 'cursor', key: 'V' },
+  { id: 'road', name: 'Roads & Bridges', icon: 'road', key: '1' },
+  { id: 'res', name: 'Residential', icon: 'home', key: '2' },
+  { id: 'com', name: 'Commercial', icon: 'shop', key: '3' },
+  { id: 'ind', name: 'Industrial', icon: 'factory', key: '4' },
+  { id: 'util', name: 'Power & Water', icon: 'bolt', key: '5' },
+  { id: 'svc', name: 'Public Services', icon: 'shield', key: '6' },
+  { id: 'rec', name: 'Parks & Recreation', icon: 'tree', key: '7' },
+  { id: 'gov', name: 'Government & Strategic', icon: 'gov', key: '8' },
+  { id: 'lm', name: 'National Landmarks', icon: 'star', key: '9' },
+  { id: 'trans', name: 'Transport', icon: 'bus', key: 'T' },
+  { id: 'zone', name: 'Zoning · private builders', icon: 'zone', key: 'Z' },
   { sep: 1 },
-  { id: 'land', name: 'Wilayah & Negara Baru', icon: 'map', key: 'L' },
-  { id: 'bulldoze', name: 'Buldoser', icon: 'trash', key: 'B' },
+  { id: 'land', name: 'Territory & New Nations', icon: 'map', key: 'L' },
+  { id: 'bulldoze', name: 'Bulldozer', icon: 'trash', key: 'B' },
 ];
 const BT = {
-  house: { n: 'Rumah Tapak', c: 'res', cost: 15e3, s: 1, cap: 40, pw: 1, wt: 1, up: 25, lv: 3, days: 2, desc: 'Kompleks rumah keluarga yang asri.' },
-  apartment: { n: 'Apartemen', c: 'res', cost: 140e3, s: 1, cap: 280, pw: 5, wt: 5, up: 220, lv: 3, days: 4, unlock: 3000, desc: 'Hunian vertikal kelas menengah.' },
-  villa: { n: 'Kawasan Elit', c: 'res', cost: 650e3, s: 2, cap: 140, pw: 6, wt: 6, up: 600, lv: 1, days: 6, unlock: 10000, taxm: 5, desc: 'Warga kaya — pajak 5× per orang.' },
-  tower: { n: 'Menara Hunian', c: 'res', cost: 950e3, s: 2, cap: 1900, pw: 26, wt: 24, up: 1400, lv: 3, days: 8, unlock: 16000, desc: 'Kondominium tinggi dengan podium.' },
-  shop: { n: 'Ruko', c: 'com', cost: 35e3, s: 1, jobs: 48, pw: 2, wt: 1, up: 60, rev: 45, lv: 3, days: 2, desc: 'Usaha kecil penggerak ekonomi.' },
-  mall: { n: 'Mal', c: 'com', cost: 450e3, s: 2, jobs: 520, pw: 16, wt: 8, up: 650, rev: 50, lv: 3, days: 6, unlock: 6000, desc: 'Pusat belanja modern.' },
-  office: { n: 'Perkantoran', c: 'com', cost: 1.3e6, s: 1, jobs: 1500, pw: 28, wt: 10, up: 1700, rev: 59, lv: 3, days: 7, unlock: 20000, desc: 'Menara kantor kaca.' },
-  hotel: { n: 'Hotel Bintang 5', c: 'com', cost: 2.4e6, s: 2, jobs: 880, pw: 22, wt: 20, up: 2200, rev: 50, tour: 110e3, lv: 1, days: 8, unlock: 24000, desc: 'Menarik turis mancanegara.' },
-  skyscraper: { n: 'Pencakar Langit', c: 'com', cost: 6.5e6, s: 2, jobs: 6400, pw: 110, wt: 40, up: 7500, rev: 64, lv: 3, days: 14, unlock: 60000, desc: 'Simbol kemajuan ekonomi.' },
-  farm: { n: 'Pertanian', c: 'ind', cost: 45e3, s: 2, jobs: 64, pw: 0, wt: 4, up: 70, rev: 40, lv: 1, days: 3, desc: 'Lumbung pangan nasional.' },
-  factory: { n: 'Pabrik', c: 'ind', cost: 280e3, s: 2, jobs: 640, pw: 24, wt: 12, up: 420, rev: 52, poll: 6, lv: 2, days: 5, unlock: 2400, desc: 'Produksi massal. Menghasilkan polusi.' },
-  mine: { n: 'Tambang', c: 'ind', cost: 350e3, s: 2, jobs: 360, pw: 10, wt: 3, up: 380, rev: 100, poll: 4, lv: 1, days: 5, needs: 'hill', unlock: 2400, desc: 'Hanya di perbukitan. Untung besar.' },
-  industrial: { n: 'Kawasan Industri', c: 'ind', cost: 3.2e6, s: 3, jobs: 3800, pw: 80, wt: 40, up: 3400, rev: 56, poll: 9, lv: 1, days: 10, unlock: 36000, desc: 'Klaster industri raksasa.' },
-  solar: { n: 'Ladang Surya', c: 'util', cost: 420e3, s: 2, pgen: 140, up: 300, road: false, days: 3, desc: 'Energi bersih tanpa polusi.' },
-  wind: { n: 'Turbin Angin', c: 'util', cost: 260e3, s: 1, pgen: 90, up: 180, road: false, days: 3, desc: 'Listrik dari angin.' },
-  coal: { n: 'PLTU', c: 'util', cost: 1.5e6, s: 2, pgen: 750, up: 2400, poll: 8, days: 7, unlock: 4000, desc: 'Daya besar, polusi tinggi.' },
-  nuclear: { n: 'PLTN', c: 'util', cost: 14e6, s: 3, pgen: 4200, up: 11000, days: 18, unlock: 80000, desc: 'Daya raksasa & bersih.' },
-  watertower: { n: 'Menara Air', c: 'util', cost: 180e3, s: 1, wgen: 320, up: 180, days: 2, desc: 'Pasokan air bersih.' },
-  waterplant: { n: 'Instalasi Air', c: 'util', cost: 1.4e6, s: 2, wgen: 2400, up: 1400, days: 6, unlock: 16000, desc: 'Pengolahan air skala kota.' },
-  clinic: { n: 'Puskesmas', c: 'svc', cost: 220e3, s: 1, svc: 'health', r: 7, jobs: 80, pw: 3, wt: 2, up: 450, days: 3, desc: 'Layanan kesehatan dasar.' },
-  hospital: { n: 'Rumah Sakit', c: 'svc', cost: 1.8e6, s: 2, svc: 'health', r: 15, sv: 1.25, jobs: 800, pw: 20, wt: 15, up: 2800, days: 8, unlock: 12000, desc: 'Kesehatan lengkap + helipad.' },
-  school: { n: 'Sekolah', c: 'svc', cost: 380e3, s: 2, svc: 'edu', r: 9, jobs: 160, pw: 5, wt: 3, up: 850, days: 4, desc: 'Pendidikan dasar & menengah.' },
-  university: { n: 'Universitas', c: 'svc', cost: 3.5e6, s: 3, svc: 'edu', r: 17, sv: 1.3, jobs: 1280, pw: 30, wt: 15, up: 4200, days: 12, unlock: 32000, desc: 'Kampus riset kelas dunia.' },
-  police: { n: 'Kantor Polisi', c: 'svc', cost: 420e3, s: 1, svc: 'safety', r: 11, jobs: 140, pw: 4, wt: 2, up: 850, days: 3, desc: 'Keamanan & ketertiban.' },
-  fire: { n: 'Pemadam Kebakaran', c: 'svc', cost: 380e3, s: 1, svc: 'fire', r: 11, jobs: 120, pw: 3, wt: 4, up: 750, days: 3, desc: 'Siaga kebakaran.' },
-  park: { n: 'Taman Kota', c: 'rec', cost: 28e3, s: 1, r: 5, hap: 0.07, up: 40, road: false, days: 1, desc: 'Ruang hijau warga.' },
-  forest: { n: 'Hutan Kota', c: 'rec', cost: 12e3, s: 1, r: 4, hap: 0.03, up: 15, road: false, days: 1, desc: 'Paru-paru kota.' },
-  plaza: { n: 'Alun-Alun', c: 'rec', cost: 320e3, s: 2, r: 8, hap: 0.12, up: 300, days: 3, unlock: 4000, desc: 'Lapangan kota dengan air mancur.' },
-  stadium: { n: 'Stadion Nasional', c: 'rec', cost: 5.5e6, s: 3, r: 26, hap: 0.1, tour: 90e3, jobs: 480, pw: 30, wt: 10, up: 4800, days: 14, unlock: 24000, desc: 'Arena olahraga kebanggaan.' },
-  palace: { n: 'Istana Presiden', c: 'gov', cost: 0, s: 3, uniq: 1, nobuild: 1, r: 10, hap: 0.06, jobs: 320, pw: 8, wt: 4, up: 1000, days: 1, desc: 'Kantor & kediaman Presiden.' },
-  parliament: { n: 'Gedung Parlemen', c: 'gov', cost: 8e6, s: 3, uniq: 1, appr: 5, jobs: 600, pw: 12, wt: 6, up: 3000, days: 12, unlock: 8000, desc: 'Approval presiden +5.' },
-  port: { n: 'Pelabuhan', c: 'gov', cost: 6e6, s: 2, needs: 'coast', trade: 260e3, jobs: 880, pw: 14, wt: 6, up: 2500, days: 10, unlock: 10000, desc: 'Gerbang perdagangan laut.' },
-  military: { n: 'Pangkalan Militer', c: 'gov', cost: 9e6, s: 3, appr: 2, jobs: 1600, pw: 20, wt: 12, up: 6000, days: 12, unlock: 20000, desc: 'Approval +2 · negara agresif segan menuntut wilayahmu.' },
-  airport: { n: 'Bandara Internasional', c: 'gov', cost: 22e6, s: 4, uniq: 1, trade: 300e3, tourm: 1.5, jobs: 3600, pw: 60, wt: 20, up: 9000, days: 20, unlock: 48000, desc: 'Wisata ×1,5 + perdagangan.' },
-  monument: { n: 'Monumen Nasional', c: 'lm', cost: 15e6, s: 2, uniq: 1, r: 22, hap: 0.08, tour: 220e3, up: 1200, days: 14, unlock: 12000, desc: 'Ikon kebanggaan bangsa.' },
-  opera: { n: 'Gedung Opera', c: 'lm', cost: 24e6, s: 2, uniq: 1, r: 22, hap: 0.08, tour: 320e3, jobs: 320, pw: 10, wt: 4, up: 2400, days: 16, unlock: 32000, desc: 'Mahakarya arsitektur.' },
-  spire: { n: 'Menara Ikonik', c: 'lm', cost: 45e6, s: 2, uniq: 1, r: 30, hap: 0.1, tour: 650e3, jobs: 1200, pw: 60, wt: 20, up: 5000, days: 24, unlock: 120000, desc: 'Menara tertinggi di dunia.' },
+  house: { n: 'Houses', c: 'res', cost: 15e3, s: 1, cap: 40, pw: 1, wt: 1, up: 25, lv: 3, days: 2, desc: 'A leafy cluster of family homes.' },
+  apartment: { n: 'Apartments', c: 'res', cost: 140e3, s: 1, cap: 280, pw: 5, wt: 5, up: 220, lv: 3, days: 4, unlock: 3000, desc: 'Mid-rise middle-class housing.' },
+  villa: { n: 'Luxury Estate', c: 'res', cost: 650e3, s: 2, cap: 140, pw: 6, wt: 6, up: 600, lv: 1, days: 6, unlock: 10000, taxm: 5, desc: 'Wealthy residents — 5× tax per person.' },
+  tower: { n: 'Residential Tower', c: 'res', cost: 950e3, s: 2, cap: 1900, pw: 26, wt: 24, up: 1400, lv: 3, days: 8, unlock: 16000, desc: 'High-rise condos on a podium.' },
+  shop: { n: 'Shophouses', c: 'com', cost: 35e3, s: 1, jobs: 48, pw: 2, wt: 1, up: 60, rev: 45, lv: 3, days: 2, desc: 'Small businesses that drive the economy.' },
+  mall: { n: 'Mall', c: 'com', cost: 450e3, s: 2, jobs: 520, pw: 16, wt: 8, up: 650, rev: 50, lv: 3, days: 6, unlock: 6000, desc: 'A modern shopping center.' },
+  office: { n: 'Office Tower', c: 'com', cost: 1.3e6, s: 1, jobs: 1500, pw: 28, wt: 10, up: 1700, rev: 59, lv: 3, days: 7, unlock: 20000, desc: 'A glass office tower.' },
+  hotel: { n: '5-Star Hotel', c: 'com', cost: 2.4e6, s: 2, jobs: 880, pw: 22, wt: 20, up: 2200, rev: 50, tour: 110e3, lv: 1, days: 8, unlock: 24000, desc: 'Draws international tourists.' },
+  skyscraper: { n: 'Skyscraper', c: 'com', cost: 6.5e6, s: 2, jobs: 6400, pw: 110, wt: 40, up: 7500, rev: 64, lv: 3, days: 14, unlock: 60000, desc: 'A symbol of economic progress.' },
+  farm: { n: 'Farm', c: 'ind', cost: 45e3, s: 2, jobs: 64, pw: 0, wt: 4, up: 70, rev: 40, lv: 1, days: 3, desc: 'Feeds the nation.' },
+  factory: { n: 'Factory', c: 'ind', cost: 280e3, s: 2, jobs: 640, pw: 24, wt: 12, up: 420, rev: 52, poll: 6, lv: 2, days: 5, unlock: 2400, desc: 'Mass production. Generates pollution.' },
+  mine: { n: 'Mine', c: 'ind', cost: 350e3, s: 2, jobs: 360, pw: 10, wt: 3, up: 380, rev: 100, poll: 4, lv: 1, days: 5, needs: 'hill', unlock: 2400, desc: 'Hills only. Big profits.' },
+  industrial: { n: 'Industrial Park', c: 'ind', cost: 3.2e6, s: 3, jobs: 3800, pw: 80, wt: 40, up: 3400, rev: 56, poll: 9, lv: 1, days: 10, unlock: 36000, desc: 'A massive industrial cluster.' },
+  solar: { n: 'Solar Farm', c: 'util', cost: 420e3, s: 2, pgen: 140, up: 300, road: false, days: 3, desc: 'Clean, pollution-free energy.' },
+  wind: { n: 'Wind Turbine', c: 'util', cost: 260e3, s: 1, pgen: 90, up: 180, road: false, days: 3, desc: 'Power from the wind.' },
+  coal: { n: 'Coal Plant', c: 'util', cost: 1.5e6, s: 2, pgen: 750, up: 2400, poll: 8, days: 7, unlock: 4000, desc: 'High output, heavy pollution.' },
+  nuclear: { n: 'Nuclear Plant', c: 'util', cost: 14e6, s: 3, pgen: 4200, up: 11000, days: 18, unlock: 80000, desc: 'Massive, clean power.' },
+  watertower: { n: 'Water Tower', c: 'util', cost: 180e3, s: 1, wgen: 320, up: 180, days: 2, desc: 'Clean water supply.' },
+  waterplant: { n: 'Water Treatment Plant', c: 'util', cost: 1.4e6, s: 2, wgen: 2400, up: 1400, days: 6, unlock: 16000, desc: 'City-scale water treatment.' },
+  clinic: { n: 'Clinic', c: 'svc', cost: 220e3, s: 1, svc: 'health', r: 7, jobs: 80, pw: 3, wt: 2, up: 450, days: 3, desc: 'Basic healthcare.' },
+  hospital: { n: 'Hospital', c: 'svc', cost: 1.8e6, s: 2, svc: 'health', r: 15, sv: 1.25, jobs: 800, pw: 20, wt: 15, up: 2800, days: 8, unlock: 12000, desc: 'Full healthcare + helipad.' },
+  school: { n: 'School', c: 'svc', cost: 380e3, s: 2, svc: 'edu', r: 9, jobs: 160, pw: 5, wt: 3, up: 850, days: 4, desc: 'Primary & secondary education.' },
+  university: { n: 'University', c: 'svc', cost: 3.5e6, s: 3, svc: 'edu', r: 17, sv: 1.3, jobs: 1280, pw: 30, wt: 15, up: 4200, days: 12, unlock: 32000, desc: 'A world-class research campus.' },
+  police: { n: 'Police Station', c: 'svc', cost: 420e3, s: 1, svc: 'safety', r: 11, jobs: 140, pw: 4, wt: 2, up: 850, days: 3, desc: 'Law & order.' },
+  fire: { n: 'Fire Station', c: 'svc', cost: 380e3, s: 1, svc: 'fire', r: 11, jobs: 120, pw: 3, wt: 4, up: 750, days: 3, desc: 'Fire protection.' },
+  park: { n: 'City Park', c: 'rec', cost: 28e3, s: 1, r: 5, hap: 0.07, up: 40, road: false, days: 1, desc: 'Green space for citizens.' },
+  forest: { n: 'Urban Forest', c: 'rec', cost: 12e3, s: 1, r: 4, hap: 0.03, up: 15, road: false, days: 1, desc: 'The lungs of the city.' },
+  plaza: { n: 'Town Square', c: 'rec', cost: 320e3, s: 2, r: 8, hap: 0.12, up: 300, days: 3, unlock: 4000, desc: 'A city square with a fountain.' },
+  stadium: { n: 'National Stadium', c: 'rec', cost: 5.5e6, s: 3, r: 26, hap: 0.1, tour: 90e3, jobs: 480, pw: 30, wt: 10, up: 4800, days: 14, unlock: 24000, desc: 'A flagship sports arena.' },
+  palace: { n: 'Presidential Palace', c: 'gov', cost: 0, s: 3, uniq: 1, nobuild: 1, r: 10, hap: 0.06, jobs: 320, pw: 8, wt: 4, up: 1000, days: 1, desc: 'Office & residence of the President.' },
+  parliament: { n: 'Parliament', c: 'gov', cost: 8e6, s: 3, uniq: 1, appr: 5, jobs: 600, pw: 12, wt: 6, up: 3000, days: 12, unlock: 8000, desc: 'Presidential approval +5.' },
+  port: { n: 'Seaport', c: 'gov', cost: 6e6, s: 2, needs: 'coast', trade: 260e3, jobs: 880, pw: 14, wt: 6, up: 2500, days: 10, unlock: 10000, desc: 'Gateway for sea trade.' },
+  military: { n: 'Military Base', c: 'gov', cost: 9e6, s: 3, appr: 2, jobs: 1600, pw: 20, wt: 12, up: 6000, days: 12, unlock: 20000, desc: 'Approval +2 · aggressive nations think twice before claiming your land.' },
+  airport: { n: 'International Airport', c: 'gov', cost: 22e6, s: 4, uniq: 1, trade: 300e3, tourm: 1.5, jobs: 3600, pw: 60, wt: 20, up: 9000, days: 20, unlock: 48000, desc: 'Tourism ×1.5 + trade.' },
+  monument: { n: 'National Monument', c: 'lm', cost: 15e6, s: 2, uniq: 1, r: 22, hap: 0.08, tour: 220e3, up: 1200, days: 14, unlock: 12000, desc: 'An icon of national pride.' },
+  opera: { n: 'Opera House', c: 'lm', cost: 24e6, s: 2, uniq: 1, r: 22, hap: 0.08, tour: 320e3, jobs: 320, pw: 10, wt: 4, up: 2400, days: 16, unlock: 32000, desc: 'An architectural masterpiece.' },
+  spire: { n: 'Iconic Tower', c: 'lm', cost: 45e6, s: 2, uniq: 1, r: 30, hap: 0.1, tour: 650e3, jobs: 1200, pw: 60, wt: 20, up: 5000, days: 24, unlock: 120000, desc: 'The tallest tower in the world.' },
 };
 const VARS = { house: 6, apartment: 4, shop: 5, office: 4, mall: 2, tower: 3, skyscraper: 3, factory: 2 };
 const FLAGGED = new Set(['palace', 'parliament', 'military', 'school']);
 const LVM = [1, 1.7, 2.6], LVU = [1, 1.5, 2.1], LVC = [0, 0.7, 1.2];
 const ROAD_COST = 2500, BRIDGE_COST = [30000, 15000];
 const POL = {
-  edu: { n: 'Subsidi Pendidikan', d: 'Efek sekolah & kampus terhadap kebahagiaan +65%', cost: n => n.pop * 1.2 },
-  health: { n: 'Kesehatan Gratis', d: '+9% kebahagiaan seluruh warga', cost: n => n.pop * 1.6 },
-  green: { n: 'Energi Hijau', d: 'Polusi berkurang 60%', cost: n => n.pop * 0.8 + 20000 },
-  tour: { n: 'Promosi Pariwisata', d: 'Pendapatan wisata +40%', cost: n => 150000 },
-  sez: { n: 'Zona Ekonomi Khusus', d: 'Pendapatan bisnis +20%, kebahagiaan −3%', cost: n => 0 },
-  housing: { n: 'Program Rumah Rakyat', d: 'Kapasitas semua hunian +15%', cost: n => n.pop * 0.9 },
-  transit: { n: 'Transportasi Umum', d: 'Kapasitas jalan 2× — kemacetan turun', cost: n => n.pop * 0.7 + 30000 },
-  autoup: { n: 'Peremajaan Kota Otomatis', d: 'Bangunan yang penuh & bahagia ditingkatkan otomatis (biaya normal, kas cadangan dijaga)', cost: n => 25000 },
-  bnpb: { n: 'Badan Penanggulangan Bencana', d: 'Kerusakan bencana −50%, pemulihan 2× lebih cepat', cost: n => n.pop * 0.4 + 40000 },
-  progtax: { n: 'Pajak Progresif', d: 'Pajak warga +15%, tapi approval −3', cost: n => 0 },
-  privat: { n: 'Privatisasi Utilitas', d: 'Biaya perawatan −20%, tapi kebahagiaan −5%', cost: n => 0 },
-  fuel: { n: 'Subsidi BBM', d: 'Approval +6 — makin mahal seiring jumlah penduduk', cost: n => n.pop * 2.4 + 50000 },
-  conscript: { n: 'Wajib Militer', d: 'Negara agresif segan menuntut wilayah, tapi approval −4', cost: n => n.pop * 0.3 + 20000 },
+  edu: { n: 'Education Subsidy', d: 'Happiness effect of schools & universities +65%', cost: n => n.pop * 1.2 },
+  health: { n: 'Free Healthcare', d: '+9% happiness for all citizens', cost: n => n.pop * 1.6 },
+  green: { n: 'Green Energy', d: 'Pollution reduced by 60%', cost: n => n.pop * 0.8 + 20000 },
+  tour: { n: 'Tourism Promotion', d: 'Tourism income +40%', cost: n => 150000 },
+  sez: { n: 'Special Economic Zone', d: 'Business income +20%, happiness −3%', cost: n => 0 },
+  housing: { n: 'Public Housing Program', d: 'Capacity of all housing +15%', cost: n => n.pop * 0.9 },
+  transit: { n: 'Public Transit', d: '2× road capacity — less congestion', cost: n => n.pop * 0.7 + 30000 },
+  autoup: { n: 'Automatic Urban Renewal', d: 'Full, happy buildings upgrade automatically (normal cost, Treasury reserve kept)', cost: n => 25000 },
+  bnpb: { n: 'Disaster Management Agency', d: 'Disaster damage −50%, recovery 2× faster', cost: n => n.pop * 0.4 + 40000 },
+  progtax: { n: 'Progressive Tax', d: 'Income tax +15%, but Approval −3', cost: n => 0 },
+  privat: { n: 'Utility Privatization', d: 'Upkeep −20%, but happiness −5%', cost: n => 0 },
+  fuel: { n: 'Fuel Subsidy', d: 'Approval +6 — costs more as the population grows', cost: n => n.pop * 2.4 + 50000 },
+  conscript: { n: 'Conscription', d: 'Aggressive nations think twice about claiming land, but Approval −4', cost: n => n.pop * 0.3 + 20000 },
 };
-const MILESTONES = [[2000, 2e6], [5000, 4e6], [10000, 8e6], [25000, 15e6], [50000, 30e6], [100000, 60e6], [250000, 120e6], [500000, 250e6], [1e6, 500e6]];
+const MILESTONES = [[2000, 1e6], [5000, 2e6], [10000, 4e6], [25000, 8e6], [50000, 15e6], [100000, 30e6], [250000, 60e6], [500000, 125e6], [1e6, 250e6]];
 const AI_DEFS = [
-  { name: 'Republik Varanta', leader: 'Presiden Arvid Kallen', fstyle: 1, flag2: '#ffffff' },
-  { name: 'Kesultanan Meridia', leader: 'Sultan Rahmat Dirgantara', fstyle: 3, flag2: '#fde68a' },
-  { name: 'Federasi Norvalt', leader: 'Kanselir Elena Moravec', fstyle: 2, flag2: '#e2e8f0' },
+  { name: 'Republic of Varanta', leader: 'President Arvid Kallen', fstyle: 1, flag2: '#ffffff' },
+  { name: 'Sultanate of Meridia', leader: 'Sultan Rahmat Dirgantara', fstyle: 3, flag2: '#fde68a' },
+  { name: 'Norvalt Federation', leader: 'Chancellor Elena Moravec', fstyle: 2, flag2: '#e2e8f0' },
 ];
 
 /* ---------------- state ---------------- */
@@ -194,6 +195,7 @@ const S = {
   tool: { mode: 'select', type: null, rot: 0 }, political: false, showGrid: true, dayNight: true, sfx: true,
   cleared: new Set(), roadSet: new Set(), news: [], mis: [], cnt: { road: 0, land: 0, up: 0, trade: 0, b: {} }, unl: { diplo: false, found: false }, overlay: null, trackOpen: true, terrDirty: true, selected: null, drawer: null, cycle: 0.32,
   diff: 'normal', mode: 'career', over: null, won: null, ended: null, music: true, disasters: true, gfx: 'high',
+  feed: [], wx: null, eidUntil: 0, feedOpen: true,
   evq: [], evRecent: [], mq: [], st: { months: 0, apprSum: 0, peak: 0, greenM: 0, relSum: 0 }, dmgSet: new Set(), zoneDirty: true, dmgDirty: false,
 };
 const W = { uTime: { value: 0 }, treeAt: new Map(), treeMesh: [], noise: null };

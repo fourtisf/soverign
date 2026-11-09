@@ -1,49 +1,62 @@
-# SOVEREIGN — Bangun Negaramu
+# SOVEREIGN — Build Your Nation
 
-Game nation builder 3D di browser. Kamu jadi presiden: mulai dengan lahan, modal, dan fasilitas dasar, lalu bangun negaramu. Setelah negaramu maju, buka diplomasi dan dirikan hingga 5 negara.
+A 3D nation-builder that runs in the browser. You are the president: start with land, some capital and basic facilities, then grow your country. Once it is developed, open diplomacy and found up to 5 nations.
 
-**Baru di v0.3:** mode Karier (bisa menang & kalah) atau Bebas, 3 tingkat kesulitan, tuntutan rakyat, krisis fiskal & bailout IMF, pemakzulan, pemilu yang bisa kalah, kemenangan Negara Adidaya & gelar sejarah; tetangga AI berkepribadian (tarif, sanksi, tuntutan wilayah); 24 event berantai dengan efek berbulan-bulan; 7 kebijakan baru; zonasi (Z) & peremajaan otomatis; kemacetan, nilai tanah, bencana alam; musik latar; pengaturan grafis; ekspor/impor simpanan.
+**What's in it**
+- **Challenge:** Career mode (win and lose) or Sandbox, three difficulty levels, public demand, fiscal crises and IMF bailouts, impeachment, elections you can lose, a Superpower victory and a historical title at the end of your term.
+- **A living world:** AI neighbours with personalities (tariffs, sanctions, territorial demands, trade and alliance offers), 24 chained events with lasting effects and 7 trade-off policies.
+- **A real city:** zoning (Z) with private developers, automatic upgrades, traffic, land value and disasters.
+- **v0.4 realism:**
+  - **Movement and weather:** buses, pedestrians, planes taking off and ships sailing to your ports; rush hour; tropical rainy and dry seasons with storms.
+  - **Transport and people:** a Bus Terminal and a Metro Station (T); a citizens' feed with district names.
+  - **Calendar and economy:** New Year, Independence Day and an Eid holiday that moves every year; inflation, real GDP growth, quarterly reports and ministry budgets.
+- **Settings:** background music, graphics quality, and save export/import.
 
-## Mainkan
-- **Online (gratis, tanpa domain/server):** https://fourtisf.github.io/soverign/ — di-deploy otomatis oleh GitHub Pages setiap ada push ke branch default. Aktifkan sekali di **Settings → Pages → Source: GitHub Actions**.
-- **Langsung:** buka `dist/index.html` di Chrome (butuh internet untuk Three.js & font).
-- **Lokal:** `npm run preview` → http://localhost:4173
+## Play
+- **Online (free, no domain or server):** https://fourtisf.github.io/soverign/. GitHub Pages deploys it automatically on every push to the default branch. Enable it once under **Settings → Pages → Source: GitHub Actions**.
+- **Offline file:** open `dist/index.html` in Chrome. It needs internet for Three.js and the fonts.
+- **Local server:** `npm run preview`, then open http://localhost:4173
 
 ## Build & deploy
 ```bash
 node build.mjs                 # src/ → dist/index.html
-./deploy/deploy.sh user@vps    # upload ke /var/www/sovereign/dist (Nginx)
+./deploy/deploy.sh user@vps    # upload to /var/www/sovereign/dist (Nginx)
 ```
-Konfigurasi Nginx ada di `deploy/nginx.conf.example`, dan untuk Vercel cukup `vercel.json`.
+The Nginx config is in `deploy/nginx.conf.example`. For Vercel, `vercel.json` is enough.
 
-## Deploy otomatis lewat GitHub Actions
-`.github/workflows/deploy.yml` berjalan di setiap push:
-1. **Test** (semua branch): build, cek `dist/` sama dengan hasil build, lalu buka game di Chromium headless, klik "Mulai Memerintah", dan gagal jika ada error di console.
-2. **Pages** (hanya branch default): publikasikan `dist/` ke GitHub Pages, lalu jalankan test browser yang sama ke situs live.
-3. **Deploy VPS** (hanya branch default, opsional): upload `dist/` ke VPS dengan `deploy/deploy.sh`. Pada deploy pertama, `deploy/server-setup.sh` memasang site Nginx dan SSL (certbot). Setelah itu, workflow memeriksa situs live (HTTPS 200, `cache-control: no-cache`, redirect HTTP → HTTPS) dan menjalankan test browser yang sama.
+## Automatic deploy with GitHub Actions
+`.github/workflows/deploy.yml` runs on every push:
+1. **Test** (all branches): builds and checks that `dist/` matches the build. It then opens the game in headless Chromium and clicks "Start Governing". The job fails on any console error.
+2. **Pages** (default branch only): publishes `dist/` to GitHub Pages and runs the same browser test against the live site.
+3. **VPS deploy** (default branch only, optional): uploads `dist/` with `deploy/deploy.sh`.
+   - On the first deploy, `deploy/server-setup.sh` installs the Nginx site and SSL (certbot).
+   - It then checks the live site (HTTPS 200, `cache-control: no-cache`, HTTP → HTTPS redirect) and runs the browser test.
 
-Untuk deploy VPS, isi sekali di **Settings → Secrets and variables → Actions**:
+For the VPS deploy, set these once under **Settings → Secrets and variables → Actions**:
 
-| Nama | Jenis | Isi |
+| Name | Type | Value |
 |---|---|---|
-| `VPS_HOST` | secret | IP atau hostname VPS |
-| `VPS_USER` | secret | user SSH (root, atau user dengan sudo tanpa password) |
-| `VPS_SSH_KEY` | secret | isi private key untuk deploy (lihat di bawah) |
-| `DOMAIN` | variable | mis. `sovereign.domainmu.com` (A record harus mengarah ke VPS) |
-| `VPS_PORT` | secret, opsional | port SSH jika bukan 22 |
-| `CERTBOT_EMAIL` | variable, opsional | email untuk notifikasi Let's Encrypt |
+| `VPS_HOST` | secret | VPS IP or hostname |
+| `VPS_USER` | secret | SSH user (root, or a user with passwordless sudo) |
+| `VPS_SSH_KEY` | secret | private deploy key (see below) |
+| `DOMAIN` | variable | e.g. `sovereign.example.com` (its A record must point to the VPS) |
+| `VPS_PORT` | secret, optional | SSH port if not 22 |
+| `CERTBOT_EMAIL` | variable, optional | email for Let's Encrypt notices |
 
-Buat key khusus deploy di komputermu, lalu daftarkan public key-nya ke VPS:
+Create a deploy key on your computer and register the public key on the VPS:
 ```bash
 ssh-keygen -t ed25519 -N "" -C github-actions-sovereign -f sovereign_deploy
 ssh-copy-id -i sovereign_deploy.pub user@host
 ```
-Isi file `sovereign_deploy` (private key) ke secret `VPS_SSH_KEY`. Setelah itu buka tab **Actions → Build, test & deploy → Run workflow**, atau push commit apa saja.
+Put the contents of `sovereign_deploy` (the private key) into the `VPS_SSH_KEY` secret. Then open **Actions → Build, test & deploy → Run workflow**, or push any commit.
 
-Script setup tidak mengubah site lain. Ia berhenti dengan pesan jelas jika Nginx/certbot tidak ada, domain sudah dipakai site lain, atau config Nginx yang ada sudah error.
+The setup script never changes other sites. It stops with a clear message in any of these cases:
+- Nginx or certbot is missing.
+- The domain is already used by another site.
+- The existing Nginx config is already broken.
 
-## Dokumen
-- `HANDOFF.md` berisi arsitektur, sistem game, cara tuning balance, dan roadmap produksi.
-- `CLAUDE_CODE_PROMPT.md` berisi prompt siap-tempel untuk deploy lewat Claude Code.
+## Docs
+- `HANDOFF.md` covers the architecture, the game systems, balance tuning and the production roadmap.
+- `CLAUDE_CODE_PROMPT.md` is a ready-to-paste prompt for deploying with Claude Code.
 
-Debug: tambahkan `?debug` di URL untuk mengakses `window.__game`.
+Debug: add `?debug` to the URL to get `window.__game`.

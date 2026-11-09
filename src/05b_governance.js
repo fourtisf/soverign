@@ -16,14 +16,14 @@ Object.assign(I, {
 /* ---------------- difficulty & mode ---------------- */
 // cash: start funds ×, upk: player upkeep ×, dem: public demand per month, appLo: impeachment threshold,
 // crisis: months in deficit before bankruptcy, coal: coalition rescues allowed, dis: disaster frequency ×,
-// ai: AI diplomatic aggression ×, vic: population needed for the Adidaya victory, sc: score multiplier
+// ai: AI diplomatic aggression ×, vic: population needed for the Superpower victory, sc: score multiplier
 const DIFF = {
-  easy: { n: 'Mudah', d: 'Modal besar, rakyat sabar, bencana jarang', cash: 1.4, upk: 0.85, dem: 0.45, demMax: 30, appLo: 18, crisis: 9, coal: 99, dis: 0.5, ai: 0.6, vic: 150e3, sc: 0.75 },
-  normal: { n: 'Normal', d: 'Tantangan seimbang', cash: 1, upk: 1, dem: 0.8, demMax: 45, appLo: 25, crisis: 6, coal: 1, dis: 1, ai: 1, vic: 250e3, sc: 1 },
-  hard: { n: 'Sulit', d: 'Modal kecil, rakyat menuntut, tetangga agresif', cash: 0.7, upk: 1.15, dem: 1.1, demMax: 55, appLo: 30, crisis: 4, coal: 0, dis: 1.5, ai: 1.5, vic: 400e3, sc: 1.5 },
+  easy: { n: 'Easy', d: 'Big budget, patient citizens, rare disasters', cash: 1.4, upk: 0.85, dem: 0.45, demMax: 30, appLo: 18, crisis: 9, coal: 99, dis: 0.5, ai: 0.6, vic: 150e3, sc: 0.75 },
+  normal: { n: 'Normal', d: 'A balanced challenge', cash: 1, upk: 1, dem: 0.8, demMax: 45, appLo: 25, crisis: 6, coal: 1, dis: 1, ai: 1, vic: 250e3, sc: 1 },
+  hard: { n: 'Hard', d: 'Small budget, demanding citizens, aggressive neighbors', cash: 0.7, upk: 1.15, dem: 1.1, demMax: 55, appLo: 30, crisis: 4, coal: 0, dis: 1.5, ai: 1.5, vic: 400e3, sc: 1.5 },
 };
-const MODES = { career: { n: 'Karier', d: 'Ada kemenangan & kekalahan' }, sandbox: { n: 'Bebas', d: 'Santai, tanpa game over' } };
-const TERM_MONTHS = 240;                       // masa bakti 20 tahun (4 periode)
+const MODES = { career: { n: 'Career', d: 'Victory & defeat are possible' }, sandbox: { n: 'Sandbox', d: 'Relaxed, no game over' } };
+const TERM_MONTHS = 240;                       // 20-year tenure (4 terms)
 const dif = () => DIFF[S.diff] || DIFF.normal;
 const career = () => S.mode === 'career';
 const homeN = () => S.nations[0];
@@ -40,7 +40,7 @@ function decide(o) {
 }
 
 /* ---------------- timed effects (modifiers) ---------------- */
-const MODK = { tax: 'Pajak warga', com: 'Bisnis', ind: 'Industri', tour: 'Pariwisata', trade: 'Perdagangan', upk: 'Biaya perawatan', hap: 'Kebahagiaan', appr: 'Approval' };
+const MODK = { tax: 'Income tax', com: 'Business', ind: 'Industry', tour: 'Tourism', trade: 'Trade', upk: 'Upkeep', hap: 'Happiness', appr: 'Approval' };
 function addMod(n, id, t, k, months) { n.mods = (n.mods || []).filter(m => m.id !== id); n.mods.push({ id, t, k, left: months }); n.dirty = true; }
 function dropMods(n, prefix) { n.mods = (n.mods || []).filter(m => !m.id.startsWith(prefix)); }
 function tickMods(n) { if (!n.mods || !n.mods.length) return; for (const m of n.mods) m.left--; n.mods = n.mods.filter(m => m.left > 0); }
@@ -58,6 +58,7 @@ function natMods(n) {
   if (p.fuel) M.appr += 6;
   if (p.conscript) M.appr -= 4;
   if (!n.ai) M.upk *= dif().upk;
+  const P = priceNow(n); M.tax *= P; M.com *= P; M.ind *= P; M.trade *= P; M.upk *= P; M.tour *= P * wxNow().tour;
   const over = Math.max(0, (n.cong || 0) - 1);
   if (over > 0) { M.hap -= Math.min(0.15, over * 0.12); M.com *= 1 - Math.min(0.3, over * 0.2); }
   return M;
@@ -72,8 +73,8 @@ function updateDemand(n) {
   const D = dif(), before = n.dem || 0, rate = D.dem * clamp(1 - totalPop() / D.vic, 0.25, 1);
   n.dem = clamp(before + rate - clamp(g * 300, 0, 8), 0, D.demMax);
   if (n.id === S.active) {
-    if (before < 15 && n.dem >= 15) toast('Rakyat mulai tidak sabar', 'Tuntutan rakyat naik — tumbuhkan penduduk & selesaikan program kerja', 'wa', 'users');
-    if (before < 30 && n.dem >= 30) toast('Tuntutan rakyat tinggi!', `Approval tergerus ${Math.round(n.dem)} poin. Rakyat menuntut kemajuan nyata`, 'bad', 'users');
+    if (before < 15 && n.dem >= 15) toast('Citizens are growing impatient', 'Public demand is rising — grow your population & complete your agenda', 'wa', 'users');
+    if (before < 30 && n.dem >= 30) toast('Public demand is high!', `Approval down ${Math.round(n.dem)} points. Citizens want real progress`, 'bad', 'users');
   }
 }
 function checkCrisis(n) {
@@ -84,19 +85,19 @@ function checkCrisis(n) {
   if (n.debtM >= D.crisis) return nationFails(n, 'bankrupt');
   if (n.lowM >= 6) return nationFails(n, 'impeach');
   if (n.debtM === Math.ceil(D.crisis / 2) && S.day - (n.imfDay ?? -9999) > 1800) queueModal(() => imfModal(n));
-  else if (n.debtM === 1 && n.id === S.active) toast('Peringatan krisis fiskal', `Kas minus ${D.crisis} bulan berturut-turut = negara bangkrut`, 'bad', 'alert');
+  else if (n.debtM === 1 && n.id === S.active) toast('Fiscal crisis warning', `Treasury in the red ${D.crisis} months in a row = national bankruptcy`, 'bad', 'alert');
   if (n.lowM === 2) queueModal(() => protestModal(n));
-  if (n.lowM === 4) toast('Mosi tidak percaya disiapkan!', `${esc(n.name)}: naikkan approval di atas ${D.appLo}% dalam 2 bulan`, 'bad', 'alert');
+  if (n.lowM === 4) toast('No-confidence motion in the works!', `${esc(n.name)}: raise approval above ${D.appLo}% within 2 months`, 'bad', 'alert');
 }
 function imfModal(n) {
   if (S.over || n.ai) return;
   const amt = Math.round(Math.max(5e6, -n.treasury + Math.abs(Math.min(0, n.rate.net)) * 6 + 2e6) / 1e5) * 1e5;
   decide({
-    title: 'Krisis Fiskal', sub: `${esc(n.name)} defisit ${n.debtM} bulan berturut-turut`, icon: 'alert',
-    html: `<p>Kas negara minus <b>${money(-n.treasury)}</b>. Jika kas tetap minus selama <b>${dif().crisis} bulan berturut-turut</b>, negara dinyatakan <b>bangkrut</b> dan masa jabatanmu berakhir.</p><p style="margin-top:8px">Dana Moneter Internasional menawarkan bailout <b>${money(amt)}</b> (cicilan 72 bulan, bunga 40%) dengan syarat penghematan ketat selama 12 bulan.</p>`,
+    title: 'Fiscal Crisis', sub: `${esc(n.name)} has run a deficit ${n.debtM} months in a row`, icon: 'alert',
+    html: `<p>The Treasury is <b>${money(-n.treasury)}</b> in the red. If it stays negative for <b>${dif().crisis} months in a row</b>, the nation will be declared <b>bankrupt</b> and your term will end.</p><p style="margin-top:8px">The International Monetary Fund offers a <b>${money(amt)}</b> IMF bailout (72 monthly installments, 40% interest) on condition of strict austerity for 12 months.</p>`,
     choices: [
-      { l: `Terima bailout ${money(amt)} — perawatan −10%, kebahagiaan −4%, approval −6 (12 bln)`, f: () => { n.treasury += amt; n.loans.push({ p: amt, pay: amt * 1.4 / 72, left: 72 }); n.imfDay = S.day; addMod(n, 'imf', 'Syarat penghematan IMF', { upk: 0.9, hap: -0.04, appr: -6 }, 12); addNews(`${n.name} menerima bailout IMF ${money(amt)}.`); toast('Bailout IMF cair', `+${money(amt)} · syarat penghematan berlaku`, 'wa', 'bank'); } },
-      { l: 'Tolak — atasi sendiri (naikkan pajak, kurangi program, jual aset)', f: () => toast('Bailout ditolak', 'Waktu terus berjalan — perbaiki kas sebelum bangkrut', 'bad', 'alert') },
+      { l: `Accept the ${money(amt)} bailout — upkeep −10%, happiness −4%, approval −6 (12 mo)`, f: () => { n.treasury += amt; n.loans.push({ p: amt, pay: amt * 1.4 / 72, left: 72 }); n.imfDay = S.day; addMod(n, 'imf', 'IMF austerity terms', { upk: 0.9, hap: -0.04, appr: -6 }, 12); addNews(`${n.name} accepts a ${money(amt)} IMF bailout.`); toast('IMF bailout disbursed', `+${money(amt)} · austerity terms in effect`, 'wa', 'bank'); } },
+      { l: 'Refuse — handle it yourself (raise taxes, cut programs, sell assets)', f: () => toast('Bailout refused', 'The clock is ticking — fix the Treasury before bankruptcy', 'bad', 'alert') },
     ]
   });
 }
@@ -104,50 +105,50 @@ function protestModal(n) {
   if (S.over || n.ai) return;
   const cost = Math.max(1e6, Math.round(Math.max(0, n.treasury) * 0.05 / 1e5) * 1e5);
   decide({
-    title: 'Demo Besar-besaran', sub: `${esc(n.name)} · approval ${Math.round(n.approval)}%`, icon: 'users',
-    html: `<p>Ribuan warga turun ke jalan menuntut presiden mundur. Approval sudah di bawah <b>${dif().appLo}%</b> selama 2 bulan. Jika bertahan hingga <b>6 bulan</b>, parlemen akan memakzulkanmu.</p>`,
+    title: 'Mass Protests', sub: `${esc(n.name)} · approval ${Math.round(n.approval)}%`, icon: 'users',
+    html: `<p>Thousands of citizens have taken to the streets demanding the President resign. Approval has been below <b>${dif().appLo}%</b> for 2 months. If it stays there for <b>6 months</b>, parliament will impeach you.</p>`,
     choices: [
-      { l: `Reshuffle kabinet & janji reformasi · ${money(cost)} (approval +9)`, f: () => { n.treasury -= cost; n.apprMod += 9; addNews(`${presName()} merombak kabinet ${n.name}.`); } },
-      { l: 'Bubarkan paksa (approval −4, kebahagiaan −3% selama 6 bln)', f: () => { n.apprMod -= 4; addMod(n, 'represi', 'Represi aparat', { hap: -0.03 }, 6); addNews(`Aparat membubarkan demo di ${n.name}.`); } },
-      { l: 'Abaikan', f: () => { } },
+      { l: `Reshuffle the cabinet & promise reform · ${money(cost)} (approval +9)`, f: () => { n.treasury -= cost; n.apprMod += 9; addNews(`${presName()} reshuffles the cabinet of ${n.name}.`); } },
+      { l: 'Disperse by force (approval −4, happiness −3% for 6 mo)', f: () => { n.apprMod -= 4; addMod(n, 'represi', 'Security crackdown', { hap: -0.03 }, 6); addNews(`Security forces break up protests in ${n.name}.`); } },
+      { l: 'Ignore', f: () => { } },
     ]
   });
 }
 
 /* ---------------- game over · secession ---------------- */
 const OVER = {
-  bankrupt: { t: 'Negara Bangkrut', i: 'coins', d: n => `Kas ${esc(n.name)} minus selama ${dif().crisis} bulan berturut-turut. Kreditor internasional mengambil alih keuangan negara dan parlemen memberhentikanmu.` },
-  impeach: { t: 'Dilengserkan', i: 'alert', d: n => `Approval di bawah ${dif().appLo}% selama 6 bulan. Parlemen meloloskan mosi tidak percaya dan memakzulkanmu.` },
-  election: { t: 'Kalah Pemilu', i: 'vote', d: n => `Rakyat ${esc(n.name)} memilih oposisi. Masa jabatanmu berakhir.` },
+  bankrupt: { t: 'National Bankruptcy', i: 'coins', d: n => `The Treasury of ${esc(n.name)} was in the red for ${dif().crisis} months in a row. International creditors took over the nation's finances and parliament removed you from office.` },
+  impeach: { t: 'Impeached', i: 'alert', d: n => `Approval stayed below ${dif().appLo}% for 6 months. Parliament passed a no-confidence motion and impeached you.` },
+  election: { t: 'Election Lost', i: 'vote', d: n => `The citizens of ${esc(n.name)} voted for the opposition. Your term is over.` },
 };
 function nationFails(n, reason) {
   if (n.ai || S.over) return;
   if (n.id === homeN().id) return gameOver(reason);
   // A secondary nation breaks away and becomes independent (AI).
-  n.ai = true; n.pers = 'pedagang'; n.rel = 25; n.leader = 'Presiden Sementara ' + ['Adiwangsa', 'Larasati', 'Mahendra', 'Kirana', 'Satria'][n.id % 5];
+  n.ai = true; n.pers = 'pedagang'; n.rel = 25; n.leader = 'Interim President ' + ['Adiwangsa', 'Larasati', 'Mahendra', 'Kirana', 'Satria'][n.id % 5];
   n.treasury = Math.max(n.treasury, 2e6); n.dem = 0; n.debtM = 0; n.lowM = 0; n.mods = []; n.sec = true;
   for (const p of playerNations()) { p.trades = p.trades.filter(x => x !== n.id); }
   n.trades = n.trades.filter(x => S.nations[x]?.ai);
   if (S.active === n.id) switchNation(homeN().id);
   renderNationCard(); renderMenu(); S.terrDirty = true;
-  addNews(`${n.name} memisahkan diri dan menjadi negara merdeka.`);
-  queueModal(() => modal({ title: `${esc(n.name)} memisahkan diri`, sub: OVER[reason].t, icon: 'flag', html: `<p>${OVER[reason].d(n)}</p><p style="margin-top:8px">Negara ini kini berdiri sendiri di luar kepemimpinanmu. Negara-negaramu yang lain tetap kamu pimpin.</p>`, buttons: [{ l: 'Mengerti', pri: 1 }] }));
+  addNews(`${n.name} secedes and becomes an independent nation.`);
+  queueModal(() => modal({ title: `${esc(n.name)} secedes`, sub: OVER[reason].t, icon: 'flag', html: `<p>${OVER[reason].d(n)}</p><p style="margin-top:8px">This nation now stands on its own, outside your leadership. You still lead your other nations.</p>`, buttons: [{ l: 'Got it', pri: 1 }] }));
 }
 function gameOver(reason) {
   if (S.over) return;
   S.over = { r: reason, d: S.day }; S.paused = true; renderTime();
-  addNews(`${presName()} lengser: ${OVER[reason].t}.`); saveGame(true);
+  addNews(`${presName()} leaves office: ${OVER[reason].t}.`); saveGame(true);
   queueModal(showGameOver);
 }
 function showGameOver() {
   if (!S.over) return;
   const o = OVER[S.over.r], n = homeN();
   modal({
-    title: o.t, sub: `Masa jabatan berakhir · ${dateStr(S.over.d)}`, icon: o.i, noClose: 1, wide: 1,
+    title: o.t, sub: `Term ended · ${dateStr(S.over.d)}`, icon: o.i, noClose: 1, wide: 1,
     html: `<p>${o.d(n)}</p>${legacyHTML()}`,
     buttons: [
-      { l: `${ico('sparkle')} Lanjut di mode bebas`, f: () => { S.over = null; S.mode = 'sandbox'; S.paused = false; renderTime(); addNews('Permainan dilanjutkan dalam mode bebas.'); saveGame(true); toast('Mode bebas aktif', 'Tanpa kondisi kalah — bangun sesukamu', 'info', 'sparkle'); } },
-      { l: `${ico('plus')} Main lagi`, pri: 1, f: () => { saveGame(true); location.reload(); } },
+      { l: `${ico('sparkle')} Continue in Sandbox mode`, f: () => { S.over = null; S.mode = 'sandbox'; S.paused = false; renderTime(); addNews('The game continues in Sandbox mode.'); saveGame(true); toast('Sandbox mode on', 'No way to lose — build as you like', 'info', 'sparkle'); } },
+      { l: `${ico('plus')} Play again`, pri: 1, f: () => { saveGame(true); location.reload(); } },
     ]
   });
 }
@@ -156,29 +157,29 @@ function showGameOver() {
 function victoryState() {
   const n = homeN(), D = dif();
   return [
-    { t: 'Tuntaskan semua program kerja', ok: curChapter() < 0, v: `${S.mis.length}/${MISSIONS.length}` },
-    { t: `Total penduduk negaramu ≥ ${fmtPop(D.vic)}`, ok: totalPop() >= D.vic, v: fmtPop(totalPop()) },
-    { t: 'Ekonomi (PDB) nomor 1 di dunia', ok: rankOf(n, 'gdp') === 1, v: `#${rankOf(n, 'gdp')}` },
-    { t: 'Approval negara utama ≥ 55%', ok: n.approval >= 55, v: `${Math.round(n.approval)}%` },
+    { t: 'Complete the entire agenda', ok: curChapter() < 0, v: `${S.mis.length}/${MISSIONS.length}` },
+    { t: `Total population of your nations ≥ ${fmtPop(D.vic)}`, ok: totalPop() >= D.vic, v: fmtPop(totalPop()) },
+    { t: "World's #1 economy (GDP)", ok: rankOf(n, 'gdp') === 1, v: `#${rankOf(n, 'gdp')}` },
+    { t: 'Home nation approval ≥ 55%', ok: n.approval >= 55, v: `${Math.round(n.approval)}%` },
   ];
 }
 function checkEndings(m) {
   if (!career() || S.over) return;
   if (!S.won && victoryState().every(c => c.ok)) {
-    S.won = S.day; addNews(`${homeN().name} diakui dunia sebagai Negara Adidaya!`); sfx('coin');
-    return queueModal(() => endingModal('Negara Adidaya!', 'Kemenangan · semua target tercapai', 'trophy', `<p><b>${esc(homeN().name)}</b> kini diakui dunia sebagai negara adidaya — ekonomi terbesar, rakyat yang besar dan percaya pada pemimpinnya.</p>`));
+    S.won = S.day; addNews(`${homeN().name} is recognized worldwide as a Superpower!`); sfx('coin');
+    return queueModal(() => endingModal('Superpower!', 'Victory · all goals achieved', 'trophy', `<p><b>${esc(homeN().name)}</b> is now recognized worldwide as a superpower — the largest economy, with a great people who trust their leader.</p>`));
   }
   const age = m - Math.floor(homeN().founded / 30);
   if (!S.ended && age >= TERM_MONTHS) {
-    S.ended = S.day; addNews(`Masa bakti 20 tahun ${presName()} berakhir.`);
-    queueModal(() => endingModal('Akhir Masa Bakti', '20 tahun memimpin · 4 periode', 'crown', `<p>Setelah 20 tahun dan 4 periode, masa baktimu berakhir. Sejarah akan mengenangmu sebagai:</p>`));
+    S.ended = S.day; addNews(`${presName()}'s 20 years in office come to an end.`);
+    queueModal(() => endingModal('End of Term', '20 years in power · 4 terms', 'crown', `<p>After 20 years and 4 terms, your time in office is over. History will remember you as:</p>`));
   }
 }
 function endingModal(title, sub, icon, intro) {
   S.paused = true; renderTime();
   modal({
     title, sub, icon, noClose: 1, wide: 1, html: intro + legacyHTML(),
-    buttons: [{ l: `${ico('play')} Lanjutkan (mode bebas)`, pri: 1, f: () => { S.mode = 'sandbox'; S.paused = false; renderTime(); saveGame(true); } }]
+    buttons: [{ l: `${ico('play')} Continue (Sandbox mode)`, pri: 1, f: () => { S.mode = 'sandbox'; S.paused = false; renderTime(); saveGame(true); } }]
   });
 }
 function styleOf() {
@@ -187,13 +188,13 @@ function styleOf() {
   const greens = playerNations().reduce((a, p) => a + p.list.filter(b => b.type === 'park' || b.type === 'forest' || b.type === 'solar' || b.type === 'wind').length, 0);
   const tiles = playerNations().reduce((a, p) => a + p.tiles, 0), founded = S.nations.filter(x => x.founded > 0).length;
   const c = [
-    ['Bapak Pembangunan', 'Kota-kotamu tumbuh pesat dan megah.', peak / dif().vic * 1.2],
-    ['Pemimpin Rakyat', 'Rakyat mencintaimu sepanjang masa jabatan.', (avgAppr - 55) / 25],
-    ['Presiden Hijau', 'Kamu membangun negeri yang bersih dan lestari.', st.greenM / months + greens / 250],
-    ['Diplomat Ulung', 'Dunia mengenalmu sebagai juru damai.', (S.cnt.trade + allies * 2) / 5 + (st.relSum / months - 50) / 50],
-    ['Raja Pariwisata', 'Negerimu menjadi destinasi impian dunia.', (inc.tour || 0) / tot * 3.2],
-    ['Sang Industrialis', 'Cerobong pabrikmu menggerakkan ekonomi.', (inc.ind || 0) / tot * 2.6],
-    ['Sang Ekspansionis', 'Wilayahmu membentang dari pantai ke pantai.', tiles / 3500 + founded * 0.25],
+    ['The Great Builder', 'Your cities grew fast and grand.', peak / dif().vic * 1.2],
+    ["The People's Leader", 'The people loved you throughout your term.', (avgAppr - 55) / 25],
+    ['The Green President', 'You built a clean, sustainable nation.', st.greenM / months + greens / 250],
+    ['The Master Diplomat', 'The world knows you as a peacemaker.', (S.cnt.trade + allies * 2) / 5 + (st.relSum / months - 50) / 50],
+    ['The Tourism Tycoon', "Your nation became the world's dream destination.", (inc.tour || 0) / tot * 3.2],
+    ['The Industrialist', 'Your factory smokestacks powered the economy.', (inc.ind || 0) / tot * 2.6],
+    ['The Expansionist', 'Your territory stretches from coast to coast.', tiles / 3500 + founded * 0.25],
   ];
   return c.reduce((a, b) => b[2] > a[2] ? b : a);
 }
@@ -202,23 +203,23 @@ function scoreOf() {
   const gdp = playerNations().reduce((a, p) => a + sumObj(p.rate.inc), 0);
   const landmarks = playerNations().reduce((a, p) => a + p.list.filter(b => BT[b.type].c === 'lm' && b.prog >= 1).length, 0);
   const parts = [
-    ['Penduduk puncak', Math.round(Math.max(st.peak, totalPop()) / 100)],
-    ['Ekonomi (PDB per bulan)', Math.round(gdp / 20000)],
-    ['Rata-rata approval', Math.round(avgAppr * 20)],
-    ['Lama menjabat', Math.round(S.day / 360 * 40)],
-    ['Program kerja tuntas', S.mis.length * 80],
-    ['Landmark nasional', landmarks * 300],
-    ['Negara didirikan', S.nations.filter(x => x.founded > 0).length * 400],
+    ['Peak population', Math.round(Math.max(st.peak, totalPop()) / 100)],
+    ['Economy (monthly GDP)', Math.round(gdp / 20000)],
+    ['Average approval', Math.round(avgAppr * 20)],
+    ['Years in office', Math.round(S.day / 360 * 40)],
+    ['Agenda missions completed', S.mis.length * 80],
+    ['National landmarks', landmarks * 300],
+    ['Nations founded', S.nations.filter(x => x.founded > 0).length * 400],
   ];
-  if (S.won) parts.push(['Kemenangan Adidaya', 5000]);
+  if (S.won) parts.push(['Superpower victory', 5000]);
   const base = parts.reduce((a, p) => a + p[1], 0);
   return { parts, total: Math.round(base * dif().sc), mult: dif().sc, n };
 }
 function legacyHTML() {
   const [title, desc] = styleOf(), sc = scoreOf();
-  return `<div class="box" style="margin-top:14px;display:flex;gap:12px;align-items:center"><div class="tri">${ico('trophy')}</div><div><div class="lb">Gelar sejarah</div><div class="vl">${title}</div><div class="ms">${desc}</div></div></div>
-  <div class="grid2" style="margin-top:10px;align-items:start"><div class="box"><div class="lb" style="margin-bottom:6px">Rincian skor</div><div class="lst">${sc.parts.map(p => `<div class="kv"><span>${p[0]}</span><span>${fmtPop(p[1])}</span></div>`).join('')}<div class="kv"><span>Pengali kesulitan (${dif().n})</span><span>×${String(sc.mult).replace('.', ',')}</span></div></div></div>
-  <div class="box"><div class="lb">Skor akhir</div><div class="vl" style="font-size:30px">${fmtPop(sc.total)}</div><div class="ms" style="margin-top:6px">${esc(presName())} · ${esc(homeN().name)} · ${Math.floor(S.day / 360)} tahun menjabat · ${MODES[S.mode]?.n || ''} ${dif().n}</div></div></div>`;
+  return `<div class="box" style="margin-top:14px;display:flex;gap:12px;align-items:center"><div class="tri">${ico('trophy')}</div><div><div class="lb">Historical title</div><div class="vl">${title}</div><div class="ms">${desc}</div></div></div>
+  <div class="grid2" style="margin-top:10px;align-items:start"><div class="box"><div class="lb" style="margin-bottom:6px">Score breakdown</div><div class="lst">${sc.parts.map(p => `<div class="kv"><span>${p[0]}</span><span>${fmtPop(p[1])}</span></div>`).join('')}<div class="kv"><span>Difficulty multiplier (${dif().n})</span><span>×${String(sc.mult)}</span></div></div></div>
+  <div class="box"><div class="lb">Final score</div><div class="vl" style="font-size:30px">${fmtPop(sc.total)}</div><div class="ms" style="margin-top:6px">${esc(presName())} · ${esc(homeN().name)} · ${Math.floor(S.day / 360)} years in office · ${MODES[S.mode]?.n || ''} ${dif().n}</div></div></div>`;
 }
 
 /* ---------------- world ranking ---------------- */
@@ -228,9 +229,9 @@ function rankOf(n, key) { return ranking(key).indexOf(n) + 1; }
 
 /* ---------------- AI personalities · upgrades · diplomacy ---------------- */
 const PERS = {
-  agresif: { n: 'Agresif', rel: 35, cap: 2200, exp: 2, d: 'Gemar ekspansi & menuntut wilayah' },
-  pedagang: { n: 'Pedagang', rel: 55, cap: 1600, exp: 3, d: 'Mengutamakan perdagangan' },
-  damai: { n: 'Damai', rel: 62, cap: 1400, exp: 4, d: 'Bersahabat & suka bekerja sama' },
+  agresif: { n: 'Aggressive', rel: 35, cap: 2200, exp: 2, d: 'Loves expansion & territorial claims' },
+  pedagang: { n: 'Mercantile', rel: 55, cap: 1600, exp: 3, d: 'Puts trade first' },
+  damai: { n: 'Peaceful', rel: 62, cap: 1400, exp: 4, d: 'Friendly & cooperative' },
 };
 const persOf = n => PERS[n.pers] || PERS.pedagang;
 function assignPersonalities() {
@@ -263,8 +264,8 @@ function endTrade(a) {
 }
 function applySanctions(a) {
   a.sanc = 12;
-  for (const p of playerNations()) addMod(p, 'sanksi' + a.id, `Sanksi ekonomi ${a.name}`, { tour: 0.75, trade: 0.85 }, 12);
-  addNews(`${a.name} menjatuhkan sanksi ekonomi.`);
+  for (const p of playerNations()) addMod(p, 'sanksi' + a.id, `Economic sanctions by ${a.name}`, { tour: 0.75, trade: 0.85 }, 12);
+  addNews(`${a.name} imposes economic sanctions.`);
 }
 function makePeace(a) {
   for (const p of playerNations()) { dropMods(p, 'tarif' + a.id); dropMods(p, 'sanksi' + a.id); }
@@ -294,72 +295,72 @@ function aiDiplomacy() {
   }
   return null;
 }
-const aiHead = a => `<div class="row" style="gap:10px;margin-bottom:8px"><span class="flag" style="width:42px;height:28px">${flagSVG(a)}</span><div><b>${esc(a.leader)}</b><div class="ms">${esc(a.name)} · ${persOf(a).n} · hubungan ${Math.round(a.rel)}</div></div></div>`;
+const aiHead = a => `<div class="row" style="gap:10px;margin-bottom:8px"><span class="flag" style="width:42px;height:28px">${flagSVG(a)}</span><div><b>${esc(a.leader)}</b><div class="ms">${esc(a.name)} · ${persOf(a).n} · relations ${Math.round(a.rel)}</div></div></div>`;
 function tariffEvent(a) {
   const hit = playerNations().filter(p => p.trades.includes(a.id));
-  endTrade(a); for (const p of hit) addMod(p, 'tarif' + a.id, `Tarif impor ${a.name}`, { com: 0.92, ind: 0.85 }, 12);
-  addNews(`${a.name} membatalkan perjanjian dagang dan memberlakukan tarif impor.`);
+  endTrade(a); for (const p of hit) addMod(p, 'tarif' + a.id, `Import tariffs by ${a.name}`, { com: 0.92, ind: 0.85 }, 12);
+  addNews(`${a.name} cancels its trade deal and imposes import tariffs.`);
   decide({
-    title: 'Perang Dagang!', sub: `${esc(a.name)} memberlakukan tarif impor`, icon: 'alert',
-    html: aiHead(a) + `<p>Hubungan yang memburuk membuat ${esc(a.name)} membatalkan perjanjian dagang dan menaikkan tarif. Selama 12 bulan: <b>bisnis −8%, industri −15%</b>.</p>`,
+    title: 'Trade War!', sub: `${esc(a.name)} imposes import tariffs`, icon: 'alert',
+    html: aiHead(a) + `<p>Souring relations have led ${esc(a.name)} to cancel its trade deal and raise tariffs. For 12 months: <b>business −8%, industry −15%</b>.</p>`,
     choices: [
-      { l: 'Kirim delegasi damai · $2 jt (cabut tarif, hubungan +10)', f: () => { const p = act(); if (p.treasury < 2e6) return toast('Dana tidak cukup', '', 'bad', 'alert'); p.treasury -= 2e6; makePeace(a); toast('Tarif dicabut', `${a.name} melunak`, 'info', 'hand'); } },
-      { l: 'Balas dengan tarif (hubungan −8, approval +3)', f: () => { a.rel = Math.max(0, a.rel - 8); for (const p of playerNations()) p.apprMod += 3; } },
-      { l: 'Terima saja', f: () => { } },
+      { l: 'Send a peace delegation · $2M (lift tariffs, relations +10)', f: () => { const p = act(); if (p.treasury < 2e6) return toast('Not enough funds', '', 'bad', 'alert'); p.treasury -= 2e6; makePeace(a); toast('Tariffs lifted', `${a.name} softens its stance`, 'info', 'hand'); } },
+      { l: 'Retaliate with tariffs (relations −8, approval +3)', f: () => { a.rel = Math.max(0, a.rel - 8); for (const p of playerNations()) p.apprMod += 3; } },
+      { l: 'Accept it', f: () => { } },
     ]
   });
 }
 function sanctionEvent(a) {
   applySanctions(a);
   decide({
-    title: 'Sanksi Ekonomi', sub: `${esc(a.name)} menjatuhkan sanksi`, icon: 'alert',
-    html: aiHead(a) + `<p>${esc(a.name)} menuduh negaramu bersikap bermusuhan dan menjatuhkan sanksi selama 12 bulan: <b>pariwisata −25%, perdagangan −15%</b>.</p>`,
+    title: 'Economic Sanctions', sub: `${esc(a.name)} imposes sanctions`, icon: 'alert',
+    html: aiHead(a) + `<p>${esc(a.name)} accuses your nation of hostility and imposes sanctions for 12 months: <b>tourism −25%, trade −15%</b>.</p>`,
     choices: [
-      { l: 'Negosiasi · $3 jt (cabut sanksi, hubungan +10)', f: () => { const p = act(); if (p.treasury < 3e6) return toast('Dana tidak cukup', '', 'bad', 'alert'); p.treasury -= 3e6; makePeace(a); toast('Sanksi dicabut', `${a.name} melunak`, 'info', 'hand'); } },
-      { l: 'Kecam di forum internasional (approval +4, hubungan −6)', f: () => { a.rel = Math.max(0, a.rel - 6); for (const p of playerNations()) p.apprMod += 4; } },
+      { l: 'Negotiate · $3M (lift sanctions, relations +10)', f: () => { const p = act(); if (p.treasury < 3e6) return toast('Not enough funds', '', 'bad', 'alert'); p.treasury -= 3e6; makePeace(a); toast('Sanctions lifted', `${a.name} softens its stance`, 'info', 'hand'); } },
+      { l: 'Condemn it on the world stage (approval +4, relations −6)', f: () => { a.rel = Math.max(0, a.rel - 6); for (const p of playerNations()) p.apprMod += 4; } },
     ]
   });
 }
 function demandEvent(a, me, L, deter) {
   const pay = Math.round(L.length * 60000 / 1e5) * 1e5;
   decide({
-    title: 'Tuntutan Wilayah', sub: `${esc(a.name)} mengklaim perbatasanmu`, icon: 'map',
-    html: aiHead(a) + `<p>${esc(a.leader)} mengklaim <b>${L.length} petak</b> perbatasan ${esc(me.name)} sebagai wilayah leluhur mereka.</p>${deter ? '<p class="ms" style="margin-top:6px">Pertahananmu membuat mereka tidak berani bertindak jauh jika kamu menolak.</p>' : '<p class="ms" style="margin-top:6px">Tanpa Pangkalan Militer atau Wajib Militer, menolak berisiko memicu sanksi.</p>'}`,
+    title: 'Territorial Demand', sub: `${esc(a.name)} claims your border`, icon: 'map',
+    html: aiHead(a) + `<p>${esc(a.leader)} claims <b>${L.length} tiles</b> along the border of ${esc(me.name)} as ancestral land.</p>${deter ? '<p class="ms" style="margin-top:6px">Your defenses will keep them from going too far if you refuse.</p>' : '<p class="ms" style="margin-top:6px">Without a Military Base or Conscription, refusing risks sanctions.</p>'}`,
     choices: [
-      { l: `Serahkan ${L.length} petak (hubungan +15, approval −5)`, f: () => { for (const i of L) { if (owner[i] === me.id && !tileB[i] && !road[i]) { owner[i] = a.id; zone[i] = 0; me.tiles--; a.tiles++; } } a.rel = Math.min(100, a.rel + 15); me.apprMod -= 5; S.terrDirty = true; S.zoneDirty = true; mmDirty = true; addNews(`${me.name} menyerahkan ${L.length} petak perbatasan kepada ${a.name}.`); } },
-      { l: `Bayar kompensasi ${money(pay)} (hubungan +5)`, f: () => { if (me.treasury < pay) { a.rel = Math.max(0, a.rel - 5); toast('Dana tidak cukup', 'Tuntutan menggantung — hubungan −5', 'bad', 'alert'); return; } me.treasury -= pay; a.treasury += pay; a.rel = Math.min(100, a.rel + 5); } },
-      { l: 'Tolak tegas (hubungan −15, approval +4)', f: () => { a.rel = Math.max(0, a.rel - 15); me.apprMod += 4; if (!deter && Math.random() < 0.6) { applySanctions(a); toast(`${a.name} menjatuhkan sanksi`, 'Pariwisata −25%, perdagangan −15% (12 bln)', 'bad', 'alert'); } } },
+      { l: `Cede ${L.length} tiles (relations +15, approval −5)`, f: () => { for (const i of L) { if (owner[i] === me.id && !tileB[i] && !road[i]) { owner[i] = a.id; zone[i] = 0; me.tiles--; a.tiles++; } } a.rel = Math.min(100, a.rel + 15); me.apprMod -= 5; S.terrDirty = true; S.zoneDirty = true; mmDirty = true; addNews(`${me.name} cedes ${L.length} border tiles to ${a.name}.`); } },
+      { l: `Pay ${money(pay)} in compensation (relations +5)`, f: () => { if (me.treasury < pay) { a.rel = Math.max(0, a.rel - 5); toast('Not enough funds', 'Demand left unresolved — relations −5', 'bad', 'alert'); return; } me.treasury -= pay; a.treasury += pay; a.rel = Math.min(100, a.rel + 5); } },
+      { l: 'Firmly refuse (relations −15, approval +4)', f: () => { a.rel = Math.max(0, a.rel - 15); me.apprMod += 4; if (!deter && Math.random() < 0.6) { applySanctions(a); toast(`${a.name} imposes sanctions`, 'Tourism −25%, trade −15% (12 mo)', 'bad', 'alert'); } } },
     ]
   });
 }
 function aidRequest(a, me) {
   const amt = Math.round(Math.min(5e6, 1e6 * (1 + a.pop / 20000)) / 1e5) * 1e5;
   decide({
-    title: 'Permintaan Bantuan', sub: `${esc(a.name)} dilanda krisis keuangan`, icon: 'hand',
-    html: aiHead(a) + `<p>${esc(a.leader)} meminta bantuan dana <b>${money(amt)}</b> untuk menyelamatkan ekonomi negaranya.</p>`,
+    title: 'Aid Request', sub: `${esc(a.name)} is in a financial crisis`, icon: 'hand',
+    html: aiHead(a) + `<p>${esc(a.leader)} asks for <b>${money(amt)}</b> in aid to rescue their nation's economy.</p>`,
     choices: [
-      { l: `Kirim ${money(amt)} (hubungan +12)`, f: () => { if (me.treasury < amt) return toast('Dana tidak cukup', '', 'bad', 'alert'); me.treasury -= amt; a.treasury += amt; a.rel = Math.min(100, a.rel + 12); addNews(`${me.name} membantu ${a.name} sebesar ${money(amt)}.`); } },
-      { l: 'Tolak dengan sopan (hubungan −6)', f: () => { a.rel = Math.max(0, a.rel - 6); } },
+      { l: `Send ${money(amt)} (relations +12)`, f: () => { if (me.treasury < amt) return toast('Not enough funds', '', 'bad', 'alert'); me.treasury -= amt; a.treasury += amt; a.rel = Math.min(100, a.rel + 12); addNews(`${me.name} sends ${money(amt)} in aid to ${a.name}.`); } },
+      { l: 'Politely decline (relations −6)', f: () => { a.rel = Math.max(0, a.rel - 6); } },
     ]
   });
 }
 function tradeOffer(a, me) {
   decide({
-    title: 'Tawaran Dagang', sub: `${esc(a.name)} ingin berdagang`, icon: 'hand',
-    html: aiHead(a) + `<p>${esc(a.name)} menawarkan perjanjian dagang <b>tanpa biaya</b> (biasanya $1,5 jt).</p>`,
+    title: 'Trade Offer', sub: `${esc(a.name)} wants to trade`, icon: 'hand',
+    html: aiHead(a) + `<p>${esc(a.name)} offers a trade deal <b>free of charge</b> (normally $1.5M).</p>`,
     choices: [
-      { l: 'Terima perjanjian dagang', f: () => { if (!me.trades.includes(a.id)) { me.trades.push(a.id); a.trades.push(me.id); bump('trade'); } a.rel = Math.min(100, a.rel + 5); addNews(`${me.name} dan ${a.name} menandatangani perjanjian dagang.`); toast('Perjanjian dagang ditandatangani', `${me.name} × ${a.name}`, 'gold', 'hand'); } },
-      { l: 'Tolak (hubungan −3)', f: () => { a.rel -= 3; } },
+      { l: 'Accept the trade deal', f: () => { if (!me.trades.includes(a.id)) { me.trades.push(a.id); a.trades.push(me.id); bump('trade'); } a.rel = Math.min(100, a.rel + 5); addNews(`${me.name} and ${a.name} sign a trade deal.`); toast('Trade deal signed', `${me.name} × ${a.name}`, 'gold', 'hand'); } },
+      { l: 'Decline (relations −3)', f: () => { a.rel -= 3; } },
     ]
   });
 }
 function allianceOffer(a, me) {
   decide({
-    title: 'Tawaran Aliansi', sub: `${esc(a.name)} ingin bersekutu`, icon: 'shield',
-    html: aiHead(a) + `<p>Persahabatan yang erat membuat ${esc(a.name)} menawarkan aliansi resmi dengan biaya seremonial <b>$2 jt</b> (biasanya $5 jt). Aliansi: approval +4, dagang +30%.</p>`,
+    title: 'Alliance Offer', sub: `${esc(a.name)} wants an alliance`, icon: 'shield',
+    html: aiHead(a) + `<p>Close ties have led ${esc(a.name)} to offer a formal alliance for a ceremonial fee of <b>$2M</b> (normally $5M). Alliance: approval +4, trade +30%.</p>`,
     choices: [
-      { l: 'Bersekutu · $2 jt', f: () => { if (me.treasury < 2e6) return toast('Dana tidak cukup', '', 'bad', 'alert'); me.treasury -= 2e6; a.allied = true; me.allied = true; me.apprMod += 4; addNews(`${me.name} resmi bersekutu dengan ${a.name}.`); toast(`Aliansi dengan ${a.name}!`, 'Approval naik & dagang +30%', 'gold', 'shield'); } },
-      { l: 'Belum saatnya', f: () => { } },
+      { l: 'Form the alliance · $2M', f: () => { if (me.treasury < 2e6) return toast('Not enough funds', '', 'bad', 'alert'); me.treasury -= 2e6; a.allied = true; me.allied = true; me.apprMod += 4; addNews(`${me.name} formally allies with ${a.name}.`); toast(`Alliance with ${a.name}!`, 'Approval up & trade +30%', 'gold', 'shield'); } },
+      { l: 'Not yet', f: () => { } },
     ]
   });
 }
@@ -369,61 +370,61 @@ const evScale = n => Math.max(1, n.pop / 4000);
 const anyB = (n, ...types) => n.list.some(b => types.includes(b.type) && b.prog >= 1);
 function queueEvent(id, nid, months) { S.evq.push({ id, nid, day: S.day + months * 30 }); }
 const EVENTS = [
-  { id: 'investor', t: 'Investor Asing Datang', i: 'brief', d: n => `Konsorsium global menawarkan investasi <b>${money(3e6 * evScale(n))}</b> untuk membuka kawasan industri baru di ${esc(n.name)}. Aktivis lingkungan khawatir.`,
-    a: [{ l: 'Terima investasi (industri +15% selama 2 tahun)', f: n => { n.treasury += 3e6 * evScale(n); n.apprMod -= 3; addMod(n, 'investor', 'Investasi asing', { ind: 1.15 }, 24); queueEvent('limbah', n.id, 10 + Math.floor(Math.random() * 6)); return `Kas bertambah ${money(3e6 * evScale(n))}.`; } }, { l: 'Tolak, lindungi lingkungan', f: n => { n.apprMod += 4; return 'Rakyat mengapresiasi keputusanmu.'; } }] },
-  { id: 'limbah', chain: 1, t: 'Skandal Limbah Pabrik Asing', i: 'factory', d: n => `Pabrik milik investor asing ketahuan membuang limbah ke sungai. Pembersihan menyeluruh butuh <b>${money(8e5 * evScale(n))}</b>.`,
-    a: [{ l: 'Bersihkan & denda investor', f: n => { n.treasury -= 8e5 * evScale(n); n.apprMod += 3; return 'Sungai kembali bersih.'; } }, { l: 'Tutupi demi investasi (kebahagiaan −5% setahun)', f: n => { n.apprMod -= 6; addMod(n, 'limbah', 'Sungai tercemar', { hap: -0.05 }, 12); return 'Warga marah ketika kabar bocor.'; } }] },
-  { id: 'banjir', t: 'Banjir Musiman', i: 'drop', d: n => `Hujan deras merendam beberapa permukiman. Warga menunggu respons pemerintah. Dana darurat yang dibutuhkan: <b>${money(n.pop * 120 + 2e5)}</b>.`,
-    a: [{ l: 'Kucurkan dana darurat', f: n => { n.treasury -= n.pop * 120 + 2e5; n.apprMod += 6; return 'Penanganan cepat — approval naik.'; } }, { l: 'Serahkan ke pemerintah daerah (bangunan dekat air rusak)', f: n => { n.apprMod -= 9; floodDamage(n, 6); return 'Warga kecewa, beberapa bangunan terendam.'; } }] },
-  { id: 'festival', t: 'Festival Budaya Nasional', i: 'sparkle', d: n => `Seniman mengusulkan festival budaya besar-besaran. Biaya penyelenggaraan <b>${money(5e5 * evScale(n))}</b>.`,
-    a: [{ l: 'Selenggarakan! (pariwisata +20% selama 6 bln)', f: n => { n.treasury -= 5e5 * evScale(n); n.apprMod += 6; addMod(n, 'festival', 'Gaung festival budaya', { tour: 1.2 }, 6); return 'Festival meriah, rakyat bahagia.'; } }, { l: 'Tunda tahun depan', f: n => { n.apprMod -= 1; return 'Festival ditunda.'; } }] },
-  { id: 'demo', t: 'Demo Mahasiswa', i: 'users', d: n => `Ribuan mahasiswa menuntut biaya pendidikan lebih murah. Subsidi akan memakan <b>${money(8e5 * evScale(n))}</b>.`,
-    a: [{ l: 'Kabulkan tuntutan', f: n => { n.treasury -= 8e5 * evScale(n); n.apprMod += 7; return 'Mahasiswa bubar dengan damai.'; } }, { l: 'Tolak dengan tegas', f: n => { n.apprMod -= 7; queueEvent('demo2', n.id, 2); return 'Demo meluas ke kota lain.'; } }] },
-  { id: 'demo2', chain: 1, t: 'Demo Meluas', i: 'users', d: n => `Demo mahasiswa kini diikuti buruh dan ojek daring. Tuntutan bertambah: subsidi <b>${money(1.6e6 * evScale(n))}</b>.`,
-    a: [{ l: 'Akhirnya kabulkan (biaya 2×)', f: n => { n.treasury -= 1.6e6 * evScale(n); n.apprMod += 4; return 'Situasi mereda.'; } }, { l: 'Kerahkan aparat (approval −12)', f: n => { n.apprMod -= 12; addMod(n, 'represi', 'Represi aparat', { hap: -0.04 }, 6); return 'Demo dibubarkan, luka sosial membekas.'; } }] },
-  { id: 'emas', t: 'Cadangan Emas Ditemukan', i: 'coins', d: n => `Ahli geologi menemukan cadangan emas di pegunungan ${esc(n.name)}. Eksploitasi bisa menghasilkan <b>${money(6e6 * evScale(n))}</b>.`,
-    a: [{ l: 'Eksploitasi sekarang (kebahagiaan −3% setahun)', f: n => { n.treasury += 6e6 * evScale(n); n.apprMod -= 2; addMod(n, 'tambang', 'Debu tambang emas', { hap: -0.03 }, 12); return `Kas bertambah ${money(6e6 * evScale(n))}.`; } }, { l: 'Jadikan kawasan konservasi (pariwisata +15% 2 thn)', f: n => { n.apprMod += 4; addMod(n, 'konservasi', 'Taman nasional baru', { tour: 1.15 }, 24); return 'Alam terjaga, dunia memuji.'; } }] },
-  { id: 'kunjungan', t: 'Kunjungan Kenegaraan', i: 'globe', c: () => S.unl.diplo, d: n => { const a = S.nations.find(x => x.ai); return `${a ? esc(a.leader) + ' dari ' + esc(a.name) : 'Pemimpin asing'} ingin berkunjung. Jamuan kenegaraan bernilai <b>${money(1e6)}</b>.`; },
-    a: [{ l: 'Sambut dengan jamuan megah', f: n => { n.treasury -= 1e6; const a = S.nations.find(x => x.ai); if (a) a.rel = Math.min(100, a.rel + 15); return 'Hubungan diplomatik menghangat (+15).'; } }, { l: 'Tolak dengan sopan', f: n => { const a = S.nations.find(x => x.ai); if (a) a.rel -= 8; return 'Hubungan sedikit mendingin.'; } }] },
-  { id: 'flu', t: 'Wabah Flu Musiman', i: 'shield', d: n => `Kasus flu meningkat tajam. Vaksinasi massal butuh <b>${money(n.pop * 90 + 1e5)}</b>.`,
-    a: [{ l: 'Vaksinasi massal', f: n => { n.treasury -= n.pop * 90 + 1e5; n.apprMod += 4; return 'Wabah terkendali.'; } }, { l: 'Imbau warga jaga kesehatan', f: n => { n.apprMod -= 8; for (const b of n.list) b.occ *= 0.95; return 'Penduduk berkurang 5%.'; } }] },
-  { id: 'skandal', t: 'Skandal Menteri', i: 'alert', d: n => 'Media mengungkap dugaan korupsi seorang menteri kabinetmu.',
-    a: [{ l: 'Pecat & proses hukum', f: n => { n.apprMod += 5; return 'Integritas pemerintahan terjaga.'; } }, { l: 'Lindungi menteri', f: n => { n.apprMod -= 9; if (Math.random() < 0.6) queueEvent('skandal2', n.id, 4); return 'Kepercayaan publik anjlok.'; } }] },
-  { id: 'skandal2', chain: 1, t: 'Bukti Baru Skandal', i: 'alert', d: n => 'Jurnalis investigasi merilis rekaman yang membuktikan menteri yang kamu lindungi menerima suap.',
-    a: [{ l: 'Akui kesalahan & pecat menteri', f: n => { n.apprMod -= 4; return 'Pahit, tapi rakyat menghargai kejujuranmu.'; } }, { l: 'Bantah semuanya (approval −15)', f: n => { n.apprMod -= 15; return 'Kepercayaan publik runtuh.'; } }] },
-  { id: 'startup', t: 'Startup Unicorn Lokal', i: 'sparkle', d: n => `Startup teknologi lokal meminta suntikan dana negara <b>${money(2e6 * evScale(n))}</b> dengan imbalan saham.`,
-    a: [{ l: 'Investasikan (hasil terlihat 6 bulan lagi)', f: n => { const c = 2e6 * evScale(n); n.treasury -= c; n.stake = c; queueEvent('startup2', n.id, 6); return 'Dana negara masuk ke startup.'; } }, { l: 'Biarkan pasar bekerja', f: n => 'Tidak ada perubahan.' }] },
-  { id: 'startup2', chain: 1, t: 'Kabar dari Startup Negara', i: 'sparkle', d: n => (n.stakeOk = Math.random() < 0.6) ? `Startup yang kamu danai melantai di bursa! Nilai saham negara melonjak menjadi <b>${money((n.stake || 2e6) * 3)}</b>.` : 'Startup yang kamu danai gagal mendapat pendanaan lanjutan dan tutup.',
-    a: [{ l: 'Lanjutkan', f: n => { if (n.stakeOk) { n.treasury += (n.stake || 2e6) * 3; n.apprMod += 3; addMod(n, 'tekno', 'Ekosistem startup', { com: 1.1 }, 12); return 'Sukses besar!'; } n.apprMod -= 2; return 'Dana hilang.'; } }] },
-  { id: 'komoditas', t: 'Lonjakan Harga Komoditas', i: 'chart', d: n => `Harga komoditas ekspor naik di pasar dunia. Kas negara mendapat bonus <b>${money(1.5e6 * evScale(n))}</b>.`,
-    a: [{ l: 'Masukkan ke kas negara', f: n => { n.treasury += 1.5e6 * evScale(n); return 'Kas bertambah.'; } }, { l: 'Bagikan sebagai bansos', f: n => { n.apprMod += 8; return 'Rakyat bersuka cita.'; } }] },
-  { id: 'energi', t: 'Krisis Energi Global', i: 'bolt', d: n => 'Harga minyak dunia melonjak. Biaya listrik dan transportasi naik tajam.',
-    a: [{ l: 'Subsidi energi (perawatan +12% selama 6 bln, approval +4)', f: n => { addMod(n, 'energi', 'Subsidi krisis energi', { upk: 1.12 }, 6); n.apprMod += 4; return 'Harga di tingkat warga tetap stabil.'; } }, { l: 'Lepas ke harga pasar (kebahagiaan −5% selama 6 bln)', f: n => { addMod(n, 'energi', 'Harga energi tinggi', { hap: -0.05 }, 6); return 'Warga mengeluh harga naik.'; } }] },
-  { id: 'resesi', t: 'Resesi Global', i: 'chart', d: n => `Ekonomi dunia melambat. Ekonom menyarankan paket stimulus <b>${money(3e6 * evScale(n))}</b>.`,
-    a: [{ l: 'Gelontorkan stimulus (bisnis −5% selama 6 bln)', f: n => { n.treasury -= 3e6 * evScale(n); addMod(n, 'resesi', 'Resesi global (diredam)', { com: 0.95 }, 6); return 'Dampak resesi teredam.'; } }, { l: 'Hemat anggaran (bisnis −20%, industri −15% selama 9 bln)', f: n => { addMod(n, 'resesi', 'Resesi global', { com: 0.8, ind: 0.85, upk: 0.95 }, 9); return 'Ekonomi terpukul.'; } }] },
-  { id: 'teknopark', t: 'Ledakan Ekonomi Digital', i: 'brief', c: n => n.pop >= 8000, d: n => 'Perusahaan teknologi berbondong-bondong mencari lokasi kantor baru dan meminta keringanan pajak.',
-    a: [{ l: 'Beri keringanan pajak (pajak −5%, bisnis +20% selama 18 bln)', f: n => { addMod(n, 'digital', 'Insentif ekonomi digital', { tax: 0.95, com: 1.2 }, 18); return 'Kantor-kantor baru bermunculan.'; } }, { l: 'Tidak perlu', f: n => 'Mereka memilih negara lain.' }] },
-  { id: 'pengungsi', t: 'Gelombang Pengungsi', i: 'users', c: () => S.unl.diplo, d: n => { const a = S.nations.find(x => x.ai); return `Ribuan pengungsi dari ${a ? esc(a.name) : 'negara tetangga'} tiba di perbatasan meminta perlindungan.`; },
-    a: [{ l: 'Terima pengungsi (penduduk +4%, approval −3)', f: n => { for (const b of n.list) if (BT[b.type].c === 'res') b.occ = Math.min(capOf(b), b.occ * 1.04); n.apprMod -= 3; const a = S.nations.find(x => x.ai); if (a) a.rel = Math.min(100, a.rel + 10); return 'Dunia memuji kemanusiaanmu.'; } }, { l: 'Tutup perbatasan', f: n => { n.apprMod += 2; const a = S.nations.find(x => x.ai); if (a) a.rel -= 8; return 'Perbatasan dijaga ketat.'; } }] },
-  { id: 'olimpiade', t: 'Tuan Rumah Pesta Olahraga', i: 'trophy', c: n => n.pop >= 30000 && anyB(n, 'stadium'), d: n => `Komite internasional menawarkan ${esc(n.name)} menjadi tuan rumah pesta olahraga dunia. Biaya persiapan <b>${money(8e6)}</b>.`,
-    a: [{ l: 'Ajukan diri! (setahun lagi: wisata +60% & approval +8)', f: n => { n.treasury -= 8e6; queueEvent('olimpiade2', n.id, 12); return 'Persiapan dimulai.'; } }, { l: 'Tolak, terlalu mahal', f: n => 'Kesempatan lewat.' }] },
-  { id: 'olimpiade2', chain: 1, t: 'Pesta Olahraga Dibuka!', i: 'trophy', d: n => `Mata dunia tertuju ke ${esc(n.name)}. Stadion penuh, hotel penuh, rakyat bangga.`,
-    a: [{ l: 'Rayakan!', f: n => { addMod(n, 'olimpiade', 'Demam pesta olahraga', { tour: 1.6 }, 6); n.apprMod += 8; return 'Momen bersejarah.'; } }] },
-  { id: 'kpk', t: 'Gerakan Antikorupsi', i: 'shield', d: n => 'Lembaga antikorupsi meminta dukungan anggaran untuk membongkar mafia proyek.',
-    a: [{ l: 'Dukung penuh · $1 jt (perawatan −8% selama 2 thn)', f: n => { n.treasury -= 1e6; n.apprMod += 3; addMod(n, 'kpk', 'Proyek bebas korupsi', { upk: 0.92 }, 24); return 'Anggaran proyek jadi efisien.'; } }, { l: 'Lindungi koalisi (approval −6)', f: n => { n.apprMod -= 6; return 'Publik curiga.'; } }] },
-  { id: 'mogok', t: 'Mogok Buruh Nasional', i: 'factory', c: n => anyB(n, 'factory', 'farm', 'mine', 'industrial'), d: n => 'Serikat buruh menuntut kenaikan upah minimum dan mengancam mogok nasional.',
-    a: [{ l: 'Naikkan upah (industri −8%, kebahagiaan +4% setahun)', f: n => { addMod(n, 'upah', 'Upah minimum naik', { ind: 0.92, hap: 0.04 }, 12); return 'Buruh kembali bekerja.'; } }, { l: 'Tolak (industri −30% selama 2 bln, approval −5)', f: n => { addMod(n, 'mogok', 'Mogok nasional', { ind: 0.7 }, 2); n.apprMod -= 5; return 'Pabrik-pabrik berhenti.'; } }] },
-  { id: 'hoaks', t: 'Hoaks Viral', i: 'alert', d: n => 'Berita bohong tentang kebijakanmu viral di media sosial dan dipercaya jutaan warga.',
-    a: [{ l: 'Kampanye klarifikasi · $500 rb', f: n => { n.treasury -= 5e5; return 'Hoaks berhasil diluruskan.'; } }, { l: 'Abaikan (approval −6)', f: n => { n.apprMod -= 6; return 'Hoaks terus menyebar.'; } }] },
-  { id: 'panen', t: 'Panen Raya', i: 'sparkle', c: n => n.list.filter(b => b.type === 'farm').length >= 2, d: n => `Lumbung pangan ${esc(n.name)} melimpah tahun ini.`,
-    a: [{ l: `Ekspor surplus (+${money(1.2e6)})`, f: n => { n.treasury += 1.2e6; return 'Devisa bertambah.'; } }, { l: 'Bagikan beras murah (approval +4)', f: n => { n.apprMod += 4; return 'Warga senang.'; } }] },
-  { id: 'hijau', t: 'Teknologi Hijau', i: 'wind', c: n => n.pol.green || anyB(n, 'solar', 'wind'), d: n => 'Ilmuwan nasional menawarkan teknologi efisiensi energi untuk gedung pemerintah.',
-    a: [{ l: 'Terapkan · $2 jt (perawatan −5% selama 3 thn)', f: n => { n.treasury -= 2e6; addMod(n, 'hijau', 'Efisiensi energi', { upk: 0.95 }, 36); return 'Tagihan listrik pemerintah turun.'; } }, { l: 'Nanti saja', f: n => 'Tidak ada perubahan.' }] },
+  { id: 'investor', t: 'Foreign Investors Arrive', i: 'brief', d: n => `A global consortium offers <b>${money(3e6 * evScale(n))}</b> to open a new industrial zone in ${esc(n.name)}. Environmental activists are worried.`,
+    a: [{ l: 'Accept the investment (industry +15% for 2 years)', f: n => { n.treasury += 3e6 * evScale(n); n.apprMod -= 3; addMod(n, 'investor', 'Foreign investment', { ind: 1.15 }, 24); queueEvent('limbah', n.id, 10 + Math.floor(Math.random() * 6)); return `Treasury +${money(3e6 * evScale(n))}.`; } }, { l: 'Decline and protect the environment', f: n => { n.apprMod += 4; return 'Citizens applaud your decision.'; } }] },
+  { id: 'limbah', chain: 1, t: 'Foreign Factory Waste Scandal', i: 'factory', d: n => `A foreign-owned factory was caught dumping waste into a river. A full cleanup will cost <b>${money(8e5 * evScale(n))}</b>.`,
+    a: [{ l: 'Clean up & fine the investor', f: n => { n.treasury -= 8e5 * evScale(n); n.apprMod += 3; return 'The river runs clean again.'; } }, { l: 'Cover it up to keep the investor (happiness −5% for a year)', f: n => { n.apprMod -= 6; addMod(n, 'limbah', 'Polluted river', { hap: -0.05 }, 12); return 'Citizens are furious when the story leaks.'; } }] },
+  { id: 'banjir', t: 'Seasonal Floods', i: 'drop', d: n => `Heavy rain has flooded several neighborhoods and citizens await the government's response. Emergency funds needed: <b>${money(n.pop * 120 + 2e5)}</b>.`,
+    a: [{ l: 'Release emergency funds', f: n => { n.treasury -= n.pop * 120 + 2e5; n.apprMod += 6; return 'Swift response — approval rises.'; } }, { l: 'Leave it to local officials (waterside buildings damaged)', f: n => { n.apprMod -= 9; floodDamage(n, 6); return 'Citizens are let down and several buildings are flooded.'; } }] },
+  { id: 'festival', t: 'National Culture Festival', i: 'sparkle', d: n => `Artists propose a grand cultural festival. Staging it will cost <b>${money(5e5 * evScale(n))}</b>.`,
+    a: [{ l: 'Host it! (tourism +20% for 6 mo)', f: n => { n.treasury -= 5e5 * evScale(n); n.apprMod += 6; addMod(n, 'festival', 'Festival buzz', { tour: 1.2 }, 6); return 'A lively festival — the people are happy.'; } }, { l: 'Postpone to next year', f: n => { n.apprMod -= 1; return 'Festival postponed.'; } }] },
+  { id: 'demo', t: 'Student Protests', i: 'users', d: n => `Thousands of students are demanding cheaper tuition. Subsidies would cost <b>${money(8e5 * evScale(n))}</b>.`,
+    a: [{ l: 'Meet their demands', f: n => { n.treasury -= 8e5 * evScale(n); n.apprMod += 7; return 'The students disperse peacefully.'; } }, { l: 'Firmly refuse', f: n => { n.apprMod -= 7; queueEvent('demo2', n.id, 2); return 'Protests spread to other cities.'; } }] },
+  { id: 'demo2', chain: 1, t: 'Protests Spread', i: 'users', d: n => `Workers and ride-hailing drivers have joined the student protests. Demands have grown: <b>${money(1.6e6 * evScale(n))}</b> in subsidies.`,
+    a: [{ l: 'Give in at last (2× the cost)', f: n => { n.treasury -= 1.6e6 * evScale(n); n.apprMod += 4; return 'The situation calms down.'; } }, { l: 'Deploy security forces (approval −12)', f: n => { n.apprMod -= 12; addMod(n, 'represi', 'Security crackdown', { hap: -0.04 }, 6); return 'Protests broken up, but the social scars remain.'; } }] },
+  { id: 'emas', t: 'Gold Reserves Discovered', i: 'coins', d: n => `Geologists have found gold reserves in the mountains of ${esc(n.name)}. Mining could bring in <b>${money(6e6 * evScale(n))}</b>.`,
+    a: [{ l: 'Mine it now (happiness −3% for a year)', f: n => { n.treasury += 6e6 * evScale(n); n.apprMod -= 2; addMod(n, 'tambang', 'Gold mine dust', { hap: -0.03 }, 12); return `Treasury +${money(6e6 * evScale(n))}.`; } }, { l: 'Make it a conservation area (tourism +15% for 2 yrs)', f: n => { n.apprMod += 4; addMod(n, 'konservasi', 'New national park', { tour: 1.15 }, 24); return 'Nature is preserved and the world applauds.'; } }] },
+  { id: 'kunjungan', t: 'State Visit', i: 'globe', c: () => S.unl.diplo, d: n => { const a = S.nations.find(x => x.ai); return `${a ? esc(a.leader) + ' of ' + esc(a.name) : 'A foreign leader'} wishes to pay a visit. A state banquet would cost <b>${money(1e6)}</b>.`; },
+    a: [{ l: 'Host a lavish banquet', f: n => { n.treasury -= 1e6; const a = S.nations.find(x => x.ai); if (a) a.rel = Math.min(100, a.rel + 15); return 'Diplomatic relations warm up (+15).'; } }, { l: 'Politely decline', f: n => { const a = S.nations.find(x => x.ai); if (a) a.rel -= 8; return 'Relations cool slightly.'; } }] },
+  { id: 'flu', t: 'Seasonal Flu Outbreak', i: 'shield', d: n => `Flu cases are rising sharply. A mass vaccination drive will cost <b>${money(n.pop * 90 + 1e5)}</b>.`,
+    a: [{ l: 'Mass vaccination', f: n => { n.treasury -= n.pop * 90 + 1e5; n.apprMod += 4; return 'Outbreak under control.'; } }, { l: 'Urge citizens to stay healthy', f: n => { n.apprMod -= 8; for (const b of n.list) b.occ *= 0.95; return 'Population falls by 5%.'; } }] },
+  { id: 'skandal', t: 'Minister Scandal', i: 'alert', d: n => 'The media has exposed alleged corruption by one of your cabinet ministers.',
+    a: [{ l: 'Fire & prosecute', f: n => { n.apprMod += 5; return 'Government integrity is upheld.'; } }, { l: 'Protect the minister', f: n => { n.apprMod -= 9; if (Math.random() < 0.6) queueEvent('skandal2', n.id, 4); return 'Public trust plummets.'; } }] },
+  { id: 'skandal2', chain: 1, t: 'New Evidence in Scandal', i: 'alert', d: n => 'Investigative journalists release recordings proving that the minister you protected took bribes.',
+    a: [{ l: 'Admit fault & fire the minister', f: n => { n.apprMod -= 4; return 'Bitter, but the people respect your honesty.'; } }, { l: 'Deny everything (approval −15)', f: n => { n.apprMod -= 15; return 'Public trust collapses.'; } }] },
+  { id: 'startup', t: 'Local Unicorn Startup', i: 'sparkle', d: n => `A local tech startup is asking for <b>${money(2e6 * evScale(n))}</b> in state funding in exchange for equity.`,
+    a: [{ l: 'Invest (results in 6 months)', f: n => { const c = 2e6 * evScale(n); n.treasury -= c; n.stake = c; queueEvent('startup2', n.id, 6); return 'State funds flow into the startup.'; } }, { l: 'Let the market decide', f: n => 'No change.' }] },
+  { id: 'startup2', chain: 1, t: 'News from the State-Backed Startup', i: 'sparkle', d: n => (n.stakeOk = Math.random() < 0.6) ? `The startup you backed has gone public! The state's stake has soared to <b>${money((n.stake || 2e6) * 3)}</b>.` : 'The startup you backed failed to raise more funding and has shut down.',
+    a: [{ l: 'Continue', f: n => { if (n.stakeOk) { n.treasury += (n.stake || 2e6) * 3; n.apprMod += 3; addMod(n, 'tekno', 'Startup ecosystem', { com: 1.1 }, 12); return 'A huge success!'; } n.apprMod -= 2; return 'The money is gone.'; } }] },
+  { id: 'komoditas', t: 'Commodity Price Boom', i: 'chart', d: n => `Export commodity prices are climbing on world markets, handing the Treasury a <b>${money(1.5e6 * evScale(n))}</b> windfall.`,
+    a: [{ l: 'Put it in the Treasury', f: n => { n.treasury += 1.5e6 * evScale(n); return 'The Treasury grows.'; } }, { l: 'Hand it out as welfare', f: n => { n.apprMod += 8; return 'The people rejoice.'; } }] },
+  { id: 'energi', t: 'Global Energy Crisis', i: 'bolt', d: n => 'World oil prices are soaring. Electricity and transport costs are rising sharply.',
+    a: [{ l: 'Subsidize energy (upkeep +12% for 6 mo, approval +4)', f: n => { addMod(n, 'energi', 'Energy crisis subsidy', { upk: 1.12 }, 6); n.apprMod += 4; return 'Prices stay stable for citizens.'; } }, { l: 'Let the market set prices (happiness −5% for 6 mo)', f: n => { addMod(n, 'energi', 'High energy prices', { hap: -0.05 }, 6); return 'Citizens complain about rising prices.'; } }] },
+  { id: 'resesi', t: 'Global Recession', i: 'chart', d: n => `The world economy is slowing. Economists recommend a <b>${money(3e6 * evScale(n))}</b> stimulus package.`,
+    a: [{ l: 'Roll out the stimulus (business −5% for 6 mo)', f: n => { n.treasury -= 3e6 * evScale(n); addMod(n, 'resesi', 'Global recession (cushioned)', { com: 0.95 }, 6); return "The recession's impact is softened."; } }, { l: 'Tighten the budget (business −20%, industry −15% for 9 mo)', f: n => { addMod(n, 'resesi', 'Global recession', { com: 0.8, ind: 0.85, upk: 0.95 }, 9); return 'The economy takes a hit.'; } }] },
+  { id: 'teknopark', t: 'Digital Economy Boom', i: 'brief', c: n => n.pop >= 8000, d: n => 'Tech companies are flocking in search of new office space and asking for tax breaks.',
+    a: [{ l: 'Grant tax breaks (tax −5%, business +20% for 18 mo)', f: n => { addMod(n, 'digital', 'Digital economy incentives', { tax: 0.95, com: 1.2 }, 18); return 'New offices spring up.'; } }, { l: 'No need', f: n => 'They choose another country.' }] },
+  { id: 'pengungsi', t: 'Refugee Wave', i: 'users', c: () => S.unl.diplo, d: n => { const a = S.nations.find(x => x.ai); return `Thousands of refugees from ${a ? esc(a.name) : 'a neighboring country'} arrive at the border seeking asylum.`; },
+    a: [{ l: 'Take in the refugees (population +4%, approval −3)', f: n => { for (const b of n.list) if (BT[b.type].c === 'res') b.occ = Math.min(capOf(b), b.occ * 1.04); n.apprMod -= 3; const a = S.nations.find(x => x.ai); if (a) a.rel = Math.min(100, a.rel + 10); return 'The world praises your compassion.'; } }, { l: 'Close the border', f: n => { n.apprMod += 2; const a = S.nations.find(x => x.ai); if (a) a.rel -= 8; return 'The border is tightly guarded.'; } }] },
+  { id: 'olimpiade', t: 'Hosting the World Games', i: 'trophy', c: n => n.pop >= 30000 && anyB(n, 'stadium'), d: n => `An international committee invites ${esc(n.name)} to host the World Games. Preparations will cost <b>${money(8e6)}</b>.`,
+    a: [{ l: 'Bid to host! (in a year: tourism +60% & approval +8)', f: n => { n.treasury -= 8e6; queueEvent('olimpiade2', n.id, 12); return 'Preparations are underway.'; } }, { l: 'Decline, too expensive', f: n => 'The opportunity passes.' }] },
+  { id: 'olimpiade2', chain: 1, t: 'The World Games Open!', i: 'trophy', d: n => `All eyes are on ${esc(n.name)}. Stadiums are packed, hotels are full and the nation is proud.`,
+    a: [{ l: 'Celebrate!', f: n => { addMod(n, 'olimpiade', 'Games fever', { tour: 1.6 }, 6); n.apprMod += 8; return 'A historic moment.'; } }] },
+  { id: 'kpk', t: 'Anti-Corruption Drive', i: 'shield', d: n => 'The anti-corruption agency is asking for funding to bust a bid-rigging ring in public works.',
+    a: [{ l: 'Full support · $1M (upkeep −8% for 2 yrs)', f: n => { n.treasury -= 1e6; n.apprMod += 3; addMod(n, 'kpk', 'Corruption-free projects', { upk: 0.92 }, 24); return 'Project budgets get leaner.'; } }, { l: 'Shield the coalition (approval −6)', f: n => { n.apprMod -= 6; return 'The public grows suspicious.'; } }] },
+  { id: 'mogok', t: 'National Labor Strike', i: 'factory', c: n => anyB(n, 'factory', 'farm', 'mine', 'industrial'), d: n => 'Labor unions are demanding a higher minimum wage and threatening a nationwide strike.',
+    a: [{ l: 'Raise wages (industry −8%, happiness +4% for a year)', f: n => { addMod(n, 'upah', 'Higher minimum wage', { ind: 0.92, hap: 0.04 }, 12); return 'Workers return to their jobs.'; } }, { l: 'Refuse (industry −30% for 2 mo, approval −5)', f: n => { addMod(n, 'mogok', 'National strike', { ind: 0.7 }, 2); n.apprMod -= 5; return 'Factories grind to a halt.'; } }] },
+  { id: 'hoaks', t: 'Viral Hoax', i: 'alert', d: n => 'Fake news about your policies has gone viral on social media, and millions of citizens believe it.',
+    a: [{ l: 'Fact-check campaign · $500K', f: n => { n.treasury -= 5e5; return 'The hoax has been debunked.'; } }, { l: 'Ignore it (approval −6)', f: n => { n.apprMod -= 6; return 'The hoax keeps spreading.'; } }] },
+  { id: 'panen', t: 'Bumper Harvest', i: 'sparkle', c: n => n.list.filter(b => b.type === 'farm').length >= 2, d: n => `The granaries of ${esc(n.name)} are overflowing this year.`,
+    a: [{ l: `Export the surplus (+${money(1.2e6)})`, f: n => { n.treasury += 1.2e6; return 'Export earnings rise.'; } }, { l: 'Hand out cheap rice (approval +4)', f: n => { n.apprMod += 4; return 'Citizens are pleased.'; } }] },
+  { id: 'hijau', t: 'Green Technology', i: 'wind', c: n => n.pol.green || anyB(n, 'solar', 'wind'), d: n => 'National scientists are offering energy-saving technology for government buildings.',
+    a: [{ l: 'Adopt it · $2M (upkeep −5% for 3 yrs)', f: n => { n.treasury -= 2e6; addMod(n, 'hijau', 'Energy efficiency', { upk: 0.95 }, 36); return 'Government power bills go down.'; } }, { l: 'Maybe later', f: n => 'No change.' }] },
 ];
 function runEvent(e, n) {
   S.evRecent = [e.id, ...S.evRecent.filter(x => x !== e.id)].slice(0, 6);
   decide({
-    title: e.t, sub: `Laporan untuk Presiden · ${esc(n.name)}`, icon: e.i, html: `<p>${e.d(n)}</p>`,
+    title: e.t, sub: `Briefing for the President · ${esc(n.name)}`, icon: e.i, html: `<p>${e.d(n)}</p>`,
     choices: e.a.map(a => ({ l: a.l, f: () => { const r = a.f(n); if (r) toast(e.t, r, 'info', 'info'); addNews(`${e.t}: ${a.l.replace(/ \(.*$/, '')}.`); } }))
   });
 }
@@ -452,10 +453,12 @@ function govMonthEnd(m) {
   const h = homeN(), st = S.st;
   st.months++; st.apprSum += h.approval; st.peak = Math.max(st.peak, totalPop()); if (h.pol.green) st.greenM++;
   const ais = S.nations.filter(a => a.ai); st.relSum += ais.length ? ais.reduce((a, b) => a + b.rel, 0) / ais.length : 50;
+  realMonth(m);
   checkEndings(m);
   monthEvents(m);
 }
 function govDay() {
+  realDay();
   if (S.dmgSet.size) tickDamage();
   if (S.day % 3 === 0) for (const n of playerNations()) zoneDev(n);
 }

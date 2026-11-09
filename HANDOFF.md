@@ -1,7 +1,7 @@
-# SOVEREIGN — Handoff (v0.3 prototype)
+# SOVEREIGN — Handoff (v0.4 prototype)
 
 > 3D nation builder. The player is president: starts with land, money and basic facilities, builds roads and buildings, grows a country, then unlocks diplomacy and founds up to 5 nations.
-> Status: **playable prototype.** It is pure client side, with no backend yet. v0.3 adds win/lose conditions, difficulty, competitive AI, lasting events, zoning, traffic, land value, disasters, music, graphics settings and save export/import (see §3.7–3.8).
+> Status: **playable prototype.** It is pure client side, with no backend yet. v0.3 adds win/lose conditions, difficulty, competitive AI, lasting events, zoning, traffic, land value, disasters, music, graphics settings and save export/import (see §3.7–3.8). v0.4 is fully in English and adds realism: living city, weather and seasons, transport buildings, a citizens' feed, calendar moments and a real economy (see §3.9).
 
 ---
 
@@ -9,7 +9,7 @@
 
 | | |
 |---|---|
-| Output | `dist/index.html`, a single self-contained file (~315 KB) |
+| Output | `dist/index.html`, a single self-contained file (~355 KB) |
 | Runtime deps | **Three.js r160** (ESM from `cdn.jsdelivr.net`) + Google Fonts (Unbounded, Manrope). Nothing else. |
 | Build | `node build.mjs` (Node ≥ 18, no npm install needed). It concatenates `src/` → `dist/index.html` |
 | Deploy now | Static hosting. Nginx on the Hostinger VPS (config in `deploy/`) or Vercel (`vercel.json`). GitHub Actions (`.github/workflows/deploy.yml`) builds, smoke-tests and deploys on push; setup in README |
@@ -41,6 +41,7 @@ Functions are hoisted, and every cross-file call happens only after `init()` run
 | `src/05_progression.js` | **Program Kerja** (26 missions / 4 chapters), unlock gating, RCI demand meter, data views (heatmaps + building tint), problem marker sprites |
 | `src/05b_governance.js` | Difficulty `DIFF` & modes, modal queue (`queueModal`/`decide`), timed effects (`addMod`/`natMods`), public demand, fiscal crisis/IMF, impeachment, game over & secession, victory/term end/score/style title, world ranking, AI personalities & upgrades & AI-initiated diplomacy, `EVENTS` (with follow-ups), monthly/daily drivers `govMonthEnd`/`govDay` |
 | `src/05c_city.js` | Zoning (`ZONES`, `zoneDev`, overlay), auto-upgrade, land value, disasters + repair, procedural music, graphics quality `GFX`, save export/import, status chips, approval breakdown |
+| `src/05d_realism.js` | Transport buildings (`busterminal`, `metro` added to `BT`/`GEO`), districts, weather & seasons (`WX`, rain streaks, lightning), fireworks, living city (buses, pedestrians, planes, ships, `trafficFactor`), citizens' feed, calendar (New Year, Independence Day, moving Eid holiday), inflation/price level, GDP growth, ministry budgets, drivers `realDay`/`realMonth`/`realTick` |
 | `src/06_main.js` | Camera rig, day/night, shadows, clouds, labels, save/load, new game, title screen, runtime thumbnail rendering, main loop, `init()` |
 
 ---
@@ -95,7 +96,8 @@ Functions are hoisted, and every cross-file call happens only after `init()` run
   diff, mode, over, won, ended, zones: RLE[uint8], evq:[{id,nid,day}], evRecent, st:{months,apprSum,peak,greenM,relSum},
   nations:[{id,name,color,flag2,fstyle,ai,leader,treasury,tax,capital,approval,apprMod,tiles,hist,pol,loans,ms,trades,allied,rel,radius,founded,acc,last,rate,
             popM,dem,debtM,lowM,coalUsed,mods,pers,sanc,imfDay,sec,stake}],
-  blds:[[type,x,z,rot,nid,level,variant,occ,prog,happy,dmg]], news, opts, mis, cnt, unl }
+  blds:[[type,x,z,rot,nid,level,variant,occ,prog,happy,dmg]], news, opts, mis, cnt, unl,
+  wx:{k,left,temp}, feed:[{d,who,h,dist,text,mood,x,z,bid,nid}], eidUntil }   // nations also store P, infl, bud (v0.4)
 ```
 The terrain is regenerated from `seed`, so only deltas are stored. A typical save is 20–80 KB. v1 saves load as Career · Normal and show a "what's new" dialog once.
 
@@ -117,6 +119,15 @@ The terrain is regenerated from `seed`, so only deltas are stored. A typical sav
 
 ---
 
+### 3.9 Realism (v0.4)
+- **Language**: all UI and content are English. Money uses K/M/B/T and `en-US` numbers (`fmt`, `fmtPop`). Dates read "Jan 5 · Y1" (`dateStr`).
+- **Transport**: Bus Terminal (+6,000 commuters, unlock 3k) and Metro Station (+40,000, unlock 30k) in the new Transport category (T). Road capacity = roads·220 (×2 with Public Transit, × infrastructure budget) + station capacity.
+- **Living city** (visual only): buses spawn near terminals and metro stations, plus 6 with Public Transit. Up to 500 pedestrians walk sidewalks near the camera when you zoom in (fewer at night). Each airport gets a plane flying a take-off/circuit/landing loop. Each seaport gets a ship sailing out to open sea and back. Car density follows `trafficFactor()` (rush hours, night, Eid, rain, congestion).
+- **Weather**: tropical seasons (rainy Nov–Apr, dry May–Oct) drive daily weather (`WX`: clear, cloudy, rain, storm). Solar farm output ×0.3–1, wind turbines ×1.25 in storms, tourism ×0.75–1. Floods and storms are more likely in the wet season, fires in the dry season (`seasonW`). There is a status chip and a weather dialog.
+- **Citizens' feed**: every ~4 days a post generated from real conditions (blackouts, missing services, smog, traffic, jobs, taxes, inflation, sanctions, weather, holidays, praise). Each post names a citizen and a district (`districtAt`) and clicks through to the place. Shown in a panel (desktop) and in Statistics → Citizens. "Citizen mood" = share of positive posts.
+- **Calendar**: New Year fireworks, Independence Day (Aug 17: approval ±2 depending on happiness), Eid holiday (moves 11 days earlier each year; traffic ×1.7 for a week, business +12% that month).
+- **Economy**: player nations have a price level `n.P` that grows with inflation `n.infl`. Inflation rises with deficits and loans and falls with unemployment. Construction, upgrades, repairs, land, roads, upkeep, policies and income all scale with `P`, so hoarded cash loses value. Real GDP growth comes from income history; quarterly reports appear in the news. **Ministry budgets** (education, health, public safety, infrastructure; 50–150%) scale service coverage strength (0.55 + 0.45·budget) and the matching upkeep. Milestone grants are halved compared with v0.3.
+
 ## 4. Balance knobs (where to tune)
 
 | What | Where | Current |
@@ -135,12 +146,16 @@ The terrain is regenerated from `seed`, so only deltas are stored. A typical sav
 | AI personalities | `PERS` | tile cap, expansion cadence, relation drift |
 | Events | `EVENTS` | 24, 30% chance per month |
 | Zoning | `ZONE_FEE`, `DEV_SHARE` | $250/tile, state pays 50% |
-| Disasters | `disasterRoll()` | 5.5%/month × `DIFF.dis` |
+| Disasters | `disasterRoll()` | 5.5%/month × `DIFF.dis` × `seasonW` |
+| Weather | `WX`, `wxDay()` | season probabilities, solar/tourism factors |
+| Transport capacity | `BT.busterminal/metro.tcap` | 6,000 / 40,000 commuters |
+| Inflation | `econMonth()` | base 2.5%/yr, deficit & loan pressure |
+| Ministry budgets | `BUD`, `budCov` | 50–150%, coverage 0.55 + 0.45·b |
 
 ---
 
 ## 5. Controls
-Left-click: build / select · Right-drag: pan · Middle-drag or Alt+drag: rotate/tilt · Wheel: zoom to cursor · WASD/arrows: pan · Q/E: rotate · R: rotate building · Esc / right-click: cancel tool · Tab: political map · Space: pause · 1–9, Z, B, L, V: tool categories (Z = zoning). Touch: 1 finger pans or uses the tool, 2 fingers pinch-zoom and rotate.
+Left-click: build / select · Right-drag: pan · Middle-drag or Alt+drag: rotate/tilt · Wheel: zoom to cursor · WASD/arrows: pan · Q/E: rotate · R: rotate building · Esc / right-click: cancel tool · Tab: political map · Space: pause · 1–9, T, Z, B, L, V: tool categories (T = transport, Z = zoning). Touch: 1 finger pans or uses the tool, 2 fingers pinch-zoom and rotate.
 
 ---
 
@@ -152,7 +167,7 @@ Left-click: build / select · Right-drag: pan · Middle-drag or Alt+drag: rotate
 5. Construction progresses in real time on the render loop. In background tabs, rAF pauses and so does the game. This is intentional.
 6. AI is heuristic (no long-term planning), although it now upgrades buildings and reacts diplomatically.
 7. Traffic is a nation-level congestion ratio, not per-road pathfinding. Cars are visual only.
-9. Late-game cash still piles up for an efficient player (a scripted builder reached $200–300 jt by year 10). The new pressures are approval/demand, elections, AI and disasters rather than money; tune `MILESTONES`/mission rewards if money should stay tight.
+9. Late-game cash can still pile up for a frugal player: a scripted builder that only places cheap buildings had ~$490M in real terms by year 10. Inflation erodes it at ~3.5%/yr, and an overspending bot went bankrupt in month 32. Tune `MILESTONES`, mission rewards or `econMonth` if money should stay tighter.
 8. Three.js and fonts come from CDNs. Vendor `three.module.js` locally if the CDN is a concern (change the single import at the top of `01_core.js`).
 
 ---
@@ -190,3 +205,4 @@ Left-click: build / select · Right-drag: pan · Middle-drag or Alt+drag: rotate
 - [x] v0.3: AI tariffs/sanctions/territorial demands/peace; all 24 events × all choices; follow-up events fire
 - [x] v0.3: all 4 disasters, repair all, automatic recovery; zoning builds houses/shops; auto-upgrade; transit halves congestion; land-value view
 - [x] v0.3: v1 save loads and re-saves as v2; v2 save round-trips; export → import on a fresh browser; music and graphics toggles
+- [x] v0.4: whole UI in English; transport capacity lowers congestion and spawns buses; storm lowers solar output; pedestrians when zoomed in; planes and ships move; citizens' feed and click-through; districts; New Year / Independence Day / Eid; rush-hour factor; inflation from deficits raises prices; budgets change coverage; GDP growth and quarterly reports; realism state survives save/load
