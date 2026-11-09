@@ -193,7 +193,7 @@ function renderTitle() {
     <div class="tag">Take charge of a stretch of continent, some starting capital and basic facilities. Build your nation from scratch — roads, buildings, seaports, airports, all the way up to an iconic tower — then found new nations and become President of them all.</div>
     <div class="glass tcard">
       <label class="flbl" style="margin-top:0">President name</label><input class="tinput" id="tPres" maxlength="24" placeholder="Your name">
-      <label class="flbl">Nation name</label><input class="tinput" id="tNat" maxlength="32" value="Republic of Fajar">
+      <label class="flbl">Nation name</label><input class="tinput" id="tNat" maxlength="32" value="Dawn Republic">
       <label class="flbl">Flag color</label><div class="swatch" id="tSw">${NCOLORS.map(c => `<button data-c="${c}" style="background:${c}" class="${c === col ? 'on' : ''}"></button>`).join('')}</div>
       <label class="flbl">Mode</label><div class="seg" id="tMode">${Object.keys(MODES).map(k => `<button data-v="${k}" class="${k === mode ? 'on' : ''}"><b>${MODES[k].n}</b><small>${MODES[k].d}</small></button>`).join('')}</div>
       <label class="flbl">Difficulty</label><div class="seg s3" id="tDiff">${Object.keys(DIFF).map(k => `<button data-v="${k}" class="${k === diff ? 'on' : ''}"><b>${DIFF[k].n}</b><small>${DIFF[k].d}</small></button>`).join('')}</div>
@@ -212,7 +212,7 @@ function renderTitle() {
   const reseed = v => { const s = (parseInt(v) >>> 0) || 1; if (s !== S.seed) { S.cleared = new Set(); generateWorld(s); } $('#tSeed').value = S.seed; };
   $('#tRoll').onclick = () => reseed(Math.floor(Math.random() * 1e6));
   $('#tSeed').onchange = e => reseed(e.target.value);
-  $('#tStart').onclick = () => { sfx('click'); reseed($('#tSeed').value); newGame({ president: ($('#tPres').value || '').trim(), name: ($('#tNat').value || '').trim() || 'Republic of Fajar', color: col, seed: S.seed, mode, diff }); };
+  $('#tStart').onclick = () => { sfx('click'); reseed($('#tSeed').value); newGame({ president: ($('#tPres').value || '').trim(), name: ($('#tNat').value || '').trim() || 'Dawn Republic', color: col, seed: S.seed, mode, diff }); };
   const c = $('#tCont'); if (c) c.onclick = () => { sfx('click'); loadGame(save); };
 }
 

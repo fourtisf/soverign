@@ -553,7 +553,7 @@ const POL = {
 const MILESTONES = [[2000, 1e6], [5000, 2e6], [10000, 4e6], [25000, 8e6], [50000, 15e6], [100000, 30e6], [250000, 60e6], [500000, 125e6], [1e6, 250e6]];
 const AI_DEFS = [
   { name: 'Republic of Varanta', leader: 'President Arvid Kallen', fstyle: 1, flag2: '#ffffff' },
-  { name: 'Sultanate of Meridia', leader: 'Sultan Rahmat Dirgantara', fstyle: 3, flag2: '#fde68a' },
+  { name: 'Sultanate of Meridia', leader: 'Sultan Amir Castellan', fstyle: 3, flag2: '#fde68a' },
   { name: 'Norvalt Federation', leader: 'Chancellor Elena Moravec', fstyle: 2, flag2: '#e2e8f0' },
 ];
 
@@ -2285,7 +2285,7 @@ function foundCheck(t) {
 }
 function openFoundDialog(t) {
   const used = new Set(S.nations.map(n => n.color)); let col = NCOLORS.find(c => !used.has(c)) || NCOLORS[0], fst = 1 + Math.floor(Math.random() * 3);
-  const names = ['Republic of Samudra', 'Cakrawala Federation', 'Kingdom of Nirwana', 'Republic of Arunika', 'Bentala Union', 'Republic of Baskara', 'Tirta Commonwealth'];
+  const names = ['Oceanic Republic', 'Horizon Federation', 'Kingdom of Elysium', 'Sunrise Republic', 'Terra Union', 'Solar Republic', 'Riverland Commonwealth'];
   modal({
     title: 'Found New Nation', sub: `Founding costs ${money(FOUND_COST)} from the ${esc(act().name)} Treasury. The new nation starts with ${money(FOUND_SEED)}, a Presidential Palace & basic infrastructure.`, icon: 'flag',
     html: `<label class="flbl" style="margin-top:0">Nation name</label><input class="tinput" id="fName" maxlength="32" value="${names[Math.floor(Math.random() * names.length)]}">
@@ -2821,7 +2821,7 @@ function nationFails(n, reason) {
   if (n.ai || S.over) return;
   if (n.id === homeN().id) return gameOver(reason);
   // A secondary nation breaks away and becomes independent (AI).
-  n.ai = true; n.pers = 'pedagang'; n.rel = 25; n.leader = 'Interim President ' + ['Adiwangsa', 'Larasati', 'Mahendra', 'Kirana', 'Satria'][n.id % 5];
+  n.ai = true; n.pers = 'pedagang'; n.rel = 25; n.leader = 'Interim President ' + ['Hayes', 'Laurent', 'Mercer', 'Kendall', 'Sterling'][n.id % 5];
   n.treasury = Math.max(n.treasury, 2e6); n.dem = 0; n.debtM = 0; n.lowM = 0; n.mods = []; n.sec = true;
   for (const p of playerNations()) { p.trades = p.trades.filter(x => x !== n.id); }
   n.trades = n.trades.filter(x => S.nations[x]?.ai);
@@ -3721,7 +3721,7 @@ function updateShips(dt) {
 }
 
 /* ---------------- citizen voices ---------------- */
-const FIRST = ['Sari', 'Budi', 'Maya', 'Arif', 'Dewi', 'Rina', 'Agus', 'Lina', 'Grace', 'Hana', 'Kevin', 'Nadia', 'Rizky', 'Putri', 'Daniel', 'Ayu', 'Fajar', 'Wulan', 'Leo', 'Mira', 'Joko', 'Siti', 'Andre', 'Clara', 'Omar', 'Tia', 'Raka', 'Elena'];
+const FIRST = ['Sarah', 'Ben', 'Maya', 'Alex', 'Diana', 'Rachel', 'Adam', 'Lina', 'Grace', 'Hannah', 'Kevin', 'Nadia', 'Ryan', 'Paige', 'Daniel', 'Amy', 'Felix', 'Wendy', 'Leo', 'Mira', 'Jake', 'Sophie', 'Andre', 'Clara', 'Omar', 'Tia', 'Ray', 'Elena'];
 const pickR = a => a[Math.floor(Math.random() * a.length)];
 function voicePool(n) {
   const homes = n.list.filter(b => BT[b.type].c === 'res' && b.prog >= 1 && b.occ > 5), P = [];
@@ -4034,7 +4034,7 @@ function renderTitle() {
     <div class="tag">Take charge of a stretch of continent, some starting capital and basic facilities. Build your nation from scratch — roads, buildings, seaports, airports, all the way up to an iconic tower — then found new nations and become President of them all.</div>
     <div class="glass tcard">
       <label class="flbl" style="margin-top:0">President name</label><input class="tinput" id="tPres" maxlength="24" placeholder="Your name">
-      <label class="flbl">Nation name</label><input class="tinput" id="tNat" maxlength="32" value="Republic of Fajar">
+      <label class="flbl">Nation name</label><input class="tinput" id="tNat" maxlength="32" value="Dawn Republic">
       <label class="flbl">Flag color</label><div class="swatch" id="tSw">${NCOLORS.map(c => `<button data-c="${c}" style="background:${c}" class="${c === col ? 'on' : ''}"></button>`).join('')}</div>
       <label class="flbl">Mode</label><div class="seg" id="tMode">${Object.keys(MODES).map(k => `<button data-v="${k}" class="${k === mode ? 'on' : ''}"><b>${MODES[k].n}</b><small>${MODES[k].d}</small></button>`).join('')}</div>
       <label class="flbl">Difficulty</label><div class="seg s3" id="tDiff">${Object.keys(DIFF).map(k => `<button data-v="${k}" class="${k === diff ? 'on' : ''}"><b>${DIFF[k].n}</b><small>${DIFF[k].d}</small></button>`).join('')}</div>
@@ -4053,7 +4053,7 @@ function renderTitle() {
   const reseed = v => { const s = (parseInt(v) >>> 0) || 1; if (s !== S.seed) { S.cleared = new Set(); generateWorld(s); } $('#tSeed').value = S.seed; };
   $('#tRoll').onclick = () => reseed(Math.floor(Math.random() * 1e6));
   $('#tSeed').onchange = e => reseed(e.target.value);
-  $('#tStart').onclick = () => { sfx('click'); reseed($('#tSeed').value); newGame({ president: ($('#tPres').value || '').trim(), name: ($('#tNat').value || '').trim() || 'Republic of Fajar', color: col, seed: S.seed, mode, diff }); };
+  $('#tStart').onclick = () => { sfx('click'); reseed($('#tSeed').value); newGame({ president: ($('#tPres').value || '').trim(), name: ($('#tNat').value || '').trim() || 'Dawn Republic', color: col, seed: S.seed, mode, diff }); };
   const c = $('#tCont'); if (c) c.onclick = () => { sfx('click'); loadGame(save); };
 }
 

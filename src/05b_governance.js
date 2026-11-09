@@ -125,7 +125,7 @@ function nationFails(n, reason) {
   if (n.ai || S.over) return;
   if (n.id === homeN().id) return gameOver(reason);
   // A secondary nation breaks away and becomes independent (AI).
-  n.ai = true; n.pers = 'pedagang'; n.rel = 25; n.leader = 'Interim President ' + ['Adiwangsa', 'Larasati', 'Mahendra', 'Kirana', 'Satria'][n.id % 5];
+  n.ai = true; n.pers = 'pedagang'; n.rel = 25; n.leader = 'Interim President ' + ['Hayes', 'Laurent', 'Mercer', 'Kendall', 'Sterling'][n.id % 5];
   n.treasury = Math.max(n.treasury, 2e6); n.dem = 0; n.debtM = 0; n.lowM = 0; n.mods = []; n.sec = true;
   for (const p of playerNations()) { p.trades = p.trades.filter(x => x !== n.id); }
   n.trades = n.trades.filter(x => S.nations[x]?.ai);

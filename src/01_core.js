@@ -184,7 +184,7 @@ const POL = {
 const MILESTONES = [[2000, 1e6], [5000, 2e6], [10000, 4e6], [25000, 8e6], [50000, 15e6], [100000, 30e6], [250000, 60e6], [500000, 125e6], [1e6, 250e6]];
 const AI_DEFS = [
   { name: 'Republic of Varanta', leader: 'President Arvid Kallen', fstyle: 1, flag2: '#ffffff' },
-  { name: 'Sultanate of Meridia', leader: 'Sultan Rahmat Dirgantara', fstyle: 3, flag2: '#fde68a' },
+  { name: 'Sultanate of Meridia', leader: 'Sultan Amir Castellan', fstyle: 3, flag2: '#fde68a' },
   { name: 'Norvalt Federation', leader: 'Chancellor Elena Moravec', fstyle: 2, flag2: '#e2e8f0' },
 ];
 

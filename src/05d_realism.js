@@ -270,7 +270,7 @@ function updateShips(dt) {
 }
 
 /* ---------------- citizen voices ---------------- */
-const FIRST = ['Sari', 'Budi', 'Maya', 'Arif', 'Dewi', 'Rina', 'Agus', 'Lina', 'Grace', 'Hana', 'Kevin', 'Nadia', 'Rizky', 'Putri', 'Daniel', 'Ayu', 'Fajar', 'Wulan', 'Leo', 'Mira', 'Joko', 'Siti', 'Andre', 'Clara', 'Omar', 'Tia', 'Raka', 'Elena'];
+const FIRST = ['Sarah', 'Ben', 'Maya', 'Alex', 'Diana', 'Rachel', 'Adam', 'Lina', 'Grace', 'Hannah', 'Kevin', 'Nadia', 'Ryan', 'Paige', 'Daniel', 'Amy', 'Felix', 'Wendy', 'Leo', 'Mira', 'Jake', 'Sophie', 'Andre', 'Clara', 'Omar', 'Tia', 'Ray', 'Elena'];
 const pickR = a => a[Math.floor(Math.random() * a.length)];
 function voicePool(n) {
   const homes = n.list.filter(b => BT[b.type].c === 'res' && b.prog >= 1 && b.occ > 5), P = [];

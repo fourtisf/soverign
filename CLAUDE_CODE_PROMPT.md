@@ -23,7 +23,7 @@ You are deploying **SOVEREIGN**, a 3D nation-builder browser game (Three.js r160
 5. Verify:
    - `curl -I https://<DOMAIN>` returns 200 with `content-type: text/html` and `cache-control: no-cache` on index.html.
    - The page HTML contains `SOVEREIGN` and the Three.js import from `cdn.jsdelivr.net/npm/three@0.160.0`.
-   - If a headless browser is available, load the page, click "Mulai Memerintah", and confirm there are no console errors.
+   - If a headless browser is available, load the page, click "Start Governing", and confirm there are no console errors.
 6. Report the live URL, the exact redeploy command (`./deploy/deploy.sh user@host`), and any changes made on the server.
 
 **Rules**

@@ -517,7 +517,7 @@ function foundCheck(t) {
 }
 function openFoundDialog(t) {
   const used = new Set(S.nations.map(n => n.color)); let col = NCOLORS.find(c => !used.has(c)) || NCOLORS[0], fst = 1 + Math.floor(Math.random() * 3);
-  const names = ['Republic of Samudra', 'Cakrawala Federation', 'Kingdom of Nirwana', 'Republic of Arunika', 'Bentala Union', 'Republic of Baskara', 'Tirta Commonwealth'];
+  const names = ['Oceanic Republic', 'Horizon Federation', 'Kingdom of Elysium', 'Sunrise Republic', 'Terra Union', 'Solar Republic', 'Riverland Commonwealth'];
   modal({
     title: 'Found New Nation', sub: `Founding costs ${money(FOUND_COST)} from the ${esc(act().name)} Treasury. The new nation starts with ${money(FOUND_SEED)}, a Presidential Palace & basic infrastructure.`, icon: 'flag',
     html: `<label class="flbl" style="margin-top:0">Nation name</label><input class="tinput" id="fName" maxlength="32" value="${names[Math.floor(Math.random() * names.length)]}">

@@ -34,11 +34,11 @@ Functions are hoisted, and every cross-file call happens only after `init()` run
 | File | Responsibility |
 |---|---|
 | `src/00_shell.html` | `<head>`, all CSS (design tokens in `:root`), static DOM skeleton (HUD containers, modal, title, loading) |
-| `src/01_core.js` | Constants, seeded RNG + Perlin noise, formatting (`money`, `fmt`, Indonesian units rb/jt/M/T), SVG icon set `I`, **building catalogue `BT`**, policies `POL`, milestones, AI nation defs, global state `S`, Three.js renderer/scene/lights/sky, terrain generation, heightfield + terrain mesh, water shader, instanced trees, territory overlay |
+| `src/01_core.js` | Constants, seeded RNG + Perlin noise, formatting (`money`, `fmt`, English units K/M/B/T), SVG icon set `I`, **building catalogue `BT`**, policies `POL`, milestones, AI nation defs, global state `S`, Three.js renderer/scene/lights/sky, terrain generation, heightfield + terrain mesh, water shader, instanced trees, territory overlay |
 | `src/02_geometry.js` | `GB`, the procedural geometry builder (boxes/gables/lathes → one merged BufferGeometry with vertex colors; lit windows go to a separate geometry). `GEO.<type>(g, level, variant, nationColor)` for all 37 building types, road/bridge geometry per neighbour mask, rotor, car. **Instancing `Pool`** class |
 | `src/03_simulation.js` | Placement rules, buildings, roads, cars, particles (smoke/steam/dust), nations, starter cities, daily simulation (applies `natMods`, land value, congestion), month end, elections, AI behaviour |
 | `src/04_ui.js` | Audio blips, toasts, modal system, HUD, toolbar, build drawer, info panel, overlays (ghost/cursor/range ring), input (mouse/touch/keyboard), minimap, dialogs (nations, transfer, diplomacy, policy, stats, settings, found nation) |
-| `src/05_progression.js` | **Program Kerja** (26 missions / 4 chapters), unlock gating, RCI demand meter, data views (heatmaps + building tint), problem marker sprites |
+| `src/05_progression.js` | **Agenda** (26 missions / 4 chapters), unlock gating, RCI demand meter, data views (heatmaps + building tint), problem marker sprites |
 | `src/05b_governance.js` | Difficulty `DIFF` & modes, modal queue (`queueModal`/`decide`), timed effects (`addMod`/`natMods`), public demand, fiscal crisis/IMF, impeachment, game over & secession, victory/term end/score/style title, world ranking, AI personalities & upgrades & AI-initiated diplomacy, `EVENTS` (with follow-ups), monthly/daily drivers `govMonthEnd`/`govDay` |
 | `src/05c_city.js` | Zoning (`ZONES`, `zoneDev`, overlay), auto-upgrade, land value, disasters + repair, procedural music, graphics quality `GFX`, save export/import, status chips, approval breakdown |
 | `src/05d_realism.js` | Transport buildings (`busterminal`, `metro` added to `BT`/`GEO`), districts, weather & seasons (`WX`, rain streaks, lightning), fireworks, living city (buses, pedestrians, planes, ships, `trafficFactor`), citizens' feed, calendar (New Year, Independence Day, moving Eid holiday), inflation/price level, GDP growth, ministry budgets, drivers `realDay`/`realMonth`/`realTick` |
@@ -77,17 +77,17 @@ Functions are hoisted, and every cross-file call happens only after `init()` run
 - **Approval** trends toward `happy·64 + (1−unemp)·22 ± treasury + modifiers` (parliament +5, military +2, alliance, events).
 - Month end: history snapshot (charts), loans tick, AI expansion, elections every 60 months, random event (30%), autosave.
 
-### 3.4 Progression ("fokus negara sendiri dulu")
+### 3.4 Progression ("build up your own nation first")
 - **Building unlocks** by population (`BT[type].unlock`), e.g. Apartemen 3,000, Mal 6,000, Pencakar Langit 60,000, Menara Ikonik 120,000.
 - **Milestone grants** at 2k / 5k / 10k / 25k / 50k / 100k / 250k / 500k / 1M population.
 - **Feature gates** (`UNL` in `05_progression.js`): Diplomacy at **5,000** population, founding new nations at **25,000**.
-- **Program Kerja**: 26 missions in 4 chapters, with 3 active at a time. Each mission pays a reward and each chapter pays a bonus. Clicking a mission opens the matching build tool. Player-action counters live in `S.cnt`.
+- **Agenda**: 26 missions in 4 chapters, with 3 active at a time. Each mission pays a reward and each chapter pays a bonus. Clicking a mission opens the matching build tool. Player-action counters live in `S.cnt`.
 
 ### 3.5 Multi-nation & AI
 - 3 AI nations, spawned ≥ 46–58 tiles from the player. They use the same simulation as the player.
 - `aiAct` runs every 2 days and builds by need (power, water, jobs vs housing), and sometimes upgrades a building (`aiUpgrade`). `aiRoad` extends a 4-tile grid. `aiExpand` claims land on a personality-dependent cadence and cap.
-- Personalities (`PERS`): **Agresif** (cap 2,200 tiles, relation drifts to 35, makes territorial demands, friction on shared borders), **Pedagang** (offers trade deals), **Damai** (relation drifts to 62, offers alliances).
-- Diplomacy: trade agreement (income = √(popA·popB)·9 per month), aid (+relation), alliance (relation ≥ 75), buy border land (relation ≥ 50). AI-initiated (`aiDiplomacy`, monthly): tariffs when relation < 30 and trading (business −8%, industry −15%, 12 months), sanctions when < 22 (tourism −25%, trade −15%), territorial demands, aid requests, trade and alliance offers. Military Base or the Conscription policy deters demands. "Negosiasi damai" ($2 jt) lifts tariffs/sanctions.
+- Personalities (`PERS`): **Aggressive** (cap 2,200 tiles, relation drifts to 35, makes territorial demands, friction on shared borders), **Mercantile** (offers trade deals), **Peaceful** (relation drifts to 62, offers alliances).
+- Diplomacy: trade agreement (income = √(popA·popB)·9 per month), aid (+relation), alliance (relation ≥ 75), buy border land (relation ≥ 50). AI-initiated (`aiDiplomacy`, monthly): tariffs when relation < 30 and trading (business −8%, industry −15%, 12 months), sanctions when < 22 (tourism −25%, trade −15%), territorial demands, aid requests, trade and alliance offers. Military Base or the Conscription policy deters demands. "Peace talks" ($2M) lifts tariffs/sanctions.
 - Player nations: up to 5, each with its own treasury, tax, policies, loans and approval. Funds can be transferred between them. The active nation is `S.active`.
 
 ### 3.6 Save format (`localStorage['sovereign_save_v1']`, v2)
@@ -102,18 +102,18 @@ Functions are hoisted, and every cross-file call happens only after `init()` run
 The terrain is regenerated from `seed`, so only deltas are stored. A typical save is 20–80 KB. v1 saves load as Career · Normal and show a "what's new" dialog once.
 
 ### 3.7 Challenge & governance (v0.3)
-- **Modes**: Karier (win/lose) or Bebas (sandbox, no game over). **Difficulty** `DIFF`: Mudah / Normal / Sulit (start funds, player upkeep, demand rate & cap, impeachment threshold, months to bankruptcy, coalition rescues, disaster frequency, AI aggression, victory population, score multiplier).
-- **Tuntutan rakyat** (`n.dem`): grows every month (rate shrinks as the nation approaches the victory population), relieved by growth above the best population so far (1%/month = −3), missions (−3), chapters (−8), landmarks (−6), milestones (−10). It is subtracted from the approval target.
+- **Modes**: Career (win/lose) or Sandbox (no game over). **Difficulty** `DIFF`: Easy / Normal / Hard (start funds, player upkeep, demand rate & cap, impeachment threshold, months to bankruptcy, coalition rescues, disaster frequency, AI aggression, victory population, score multiplier).
+- **Public demand** (`n.dem`): grows every month (rate shrinks as the nation approaches the victory population), relieved by growth above the best population so far (1%/month = −3), missions (−3), chapters (−8), landmarks (−6), milestones (−10). It is subtracted from the approval target.
 - **Lose**: bankrupt (treasury < 0 for `crisis` consecutive months; IMF bailout offered halfway, once per 5 years), impeachment (approval < `appLo` for 6 months; protest event at 2 months), lost election (coalition rescue: always on easy, once with ≥ 40% on normal, never on hard). A secondary player nation that fails breaks away and becomes AI instead of ending the game.
-- **Win**: Negara Adidaya = all 26 missions + total player population ≥ `vic` + GDP rank #1 + approval ≥ 55%. **Term end** after 240 months. Both show a legacy screen (style title from `styleOf`, score from `scoreOf`) and continue in sandbox.
+- **Win**: Superpower = all 26 missions + total player population ≥ `vic` + GDP rank #1 + approval ≥ 55%. **Term end** after 240 months. Both show a legacy screen (style title from `styleOf`, score from `scoreOf`) and continue in sandbox.
 - **Timed effects** (`n.mods`): multiplicative on tax/com/ind/tour/trade/upk, additive on hap/appr. Used by events, IMF, tariffs and sanctions. 7 trade-off policies added to `POL` (transit, autoup, bnpb, progtax, privat, fuel, conscript).
 - **Events**: 24 entries in `EVENTS`, no repeats within the last 6, follow-ups via `queueEvent` (e.g. investor → waste scandal, protest → escalation, startup → result 6 months later, sports bid → games a year later).
 
 ### 3.8 City dynamics (v0.3)
 - **Zoning** (tool Z): paint R/C/I zones ($250/tile). Every 3 days private developers build on zoned, road-connected tiles when RCI demand ≥ 0.3; the state pays 50% (`DEV_SHARE`). Industry needs 2×2 zoned blocks. Bulldozing clears zones.
-- **Auto-upgrade** (policy *Peremajaan Kota Otomatis*): monthly, up to 6 qualifying buildings (homes ≥ 90% full, happy ≥ 65%, land value ≥ 0.45; business/industry when unemployment ≥ 3%) while keeping a cash reserve.
-- **Land value** (`b.lval`, homes): services, parks, landmarks, water view, minus pollution. Tax multiplier 0.7 + 0.5·lval. Data view "Nilai tanah".
-- **Traffic** (`n.cong` = employed / (roads·220, ×2 with *Transportasi Umum*)): above 100% lowers happiness (up to −15%) and business revenue (up to −30%). HUD stat "Macet".
+- **Auto-upgrade** (policy *Automatic Urban Renewal*): monthly, up to 6 qualifying buildings (homes ≥ 90% full, happy ≥ 65%, land value ≥ 0.45; business/industry when unemployment ≥ 3%) while keeping a cash reserve.
+- **Land value** (`b.lval`, homes): services, parks, landmarks, water view, minus pollution. Tax multiplier 0.7 + 0.5·lval. Data map "Land value".
+- **Traffic** (`n.cong` = employed / (roads·220, ×2 with *Public Transit*)): above 100% lowers happiness (up to −15%) and business revenue (up to −30%). HUD stat "Traffic".
 - **Disasters** (from month 6, ~5.5%/month × difficulty): fire (fire-station coverage matters), earthquake, coastal flood, storm. Damaged buildings stop working, smoke and turn dark, recover automatically or can be repaired (30% of cost). BNPB policy halves damage and doubles recovery speed.
 - **Music**: generative WebAudio ambient, switches to a minor progression during crises. **Graphics**: Tinggi/Sedang/Rendah (pixel ratio, shadow map size/off), auto-defaults lower on phones; stored per device in `localStorage['sovereign_gfx']`.
 
@@ -132,13 +132,13 @@ The terrain is regenerated from `seed`, so only deltas are stored. A typical sav
 
 | What | Where | Current |
 |---|---|---|
-| Start funds | `newGame()` in `06_main.js` | $25 jt (player), $22 jt (AI) |
+| Start funds | `newGame()` in `06_main.js` | $25M (player, × difficulty), $22M (AI) |
 | Day length | `DAY_SEC` (`01_core.js`) | 0.8 s |
 | Building stats (cost, cap, jobs, power, upkeep, unlock…) | `BT` (`01_core.js`) | 37 types |
 | Level multipliers | `LVM / LVU / LVC` | cap ×1/1.7/2.6, upkeep ×1/1.5/2.1, upgrade cost 70% / 120% |
-| Road / bridge | `ROAD_COST`, `BRIDGE_COST` | $2,5 rb / $15–30 rb |
-| Land price | `landPrice()` (`04_ui.js`) | $9 rb land, $2,5 rb water × (1 + tiles/3000) |
-| Found nation | `FOUND_COST / FOUND_SEED` | $15 jt cost, $10 jt seed |
+| Road / bridge | `ROAD_COST`, `BRIDGE_COST` | $2.5K / $15–30K (× price level) |
+| Land price | `landPrice()` (`04_ui.js`) | $9K land, $2.5K water × (1 + tiles/3000) × price level |
+| Found nation | `FOUND_COST / FOUND_SEED` | $15M cost, $10M seed |
 | Feature gates | `UNL` | diplo 5k, found 25k |
 | Missions & rewards | `MISSIONS`, `CH_BONUS` | 26 missions |
 | Difficulty | `DIFF` (`05b_governance.js`) | see §3.7 |
@@ -190,7 +190,7 @@ Left-click: build / select · Right-drag: pan · Middle-drag or Alt+drag: rotate
 ---
 
 ## 8. QA checklist (verified on the prototype)
-- [x] Title → new game → welcome modal → Program Kerja visible, 3 missions
+- [x] Title → new game → welcome modal → Agenda visible, 3 missions
 - [x] Road drag (incl. bridges), building placement (1×1 paint-drag, 2×2+ click), auto-orientation toward the road, rotate with R
 - [x] Inspect panel, upgrade, demolish, bulldoze area (25% refund)
 - [x] Buy land (must touch own territory), territory borders update
