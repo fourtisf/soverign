@@ -8,7 +8,7 @@ const builtSince = (base, ...types) => types.reduce((a, t) => a + cntB(t) - (bas
 const TUT = [
   { t: 'Look around', x: 'Move the camera: drag with the right mouse button (one finger on a phone), scroll or pinch to zoom, Q/E to rotate. Find a flat, open spot near your flag.',
     prog: b => [Math.min(1, Math.floor(Math.hypot(cam.gtx - b.cam.tx, cam.gtz - b.cam.tz) / 4 + Math.abs(cam.gdist - b.cam.dist) / 12 + Math.abs(cam.gyaw - b.cam.yaw) / 0.6)), 1], r: 50e3 },
-  { t: 'Build roads', x: 'Everything needs road access. Open <b>Roads</b> (key 1) and drag across your land to lay a straight road.', target: '#tools [data-c="road"]', go: () => pickCat('road'),
+  { t: 'Build roads', x: 'Everything needs road access. Open <b>Roads</b> (key 1), then click and drag on <b>your land</b> — the tinted area inside your border — to lay a straight road.', target: '#tools [data-c="road"]', go: () => { const c = act().capital; flyTo(c.x, c.z, 55); pickCat('road'); },
     prog: b => [S.cnt.road - b.road, 10], u: 'road tiles', r: 150e3 },
   { t: 'Clean water', x: 'Open <b>Power & Water</b> (key 5) and place a <b>Water Tower</b> touching a road.', target: '#tools [data-c="util"]', go: () => { pickCat('util'); setTool('build', 'watertower'); },
     prog: b => [builtSince(b, 'watertower', 'waterplant'), 1], r: 150e3 },

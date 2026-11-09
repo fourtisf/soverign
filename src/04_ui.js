@@ -104,6 +104,7 @@ function syncTools() {
 }
 function pickCat(id) {
   if (id === 'select') { setTool('select'); closeDrawer(); return; }
+  if (S.selected) closeInfo();
   if (S.drawer === id) { closeDrawer(); setTool('select'); return; }
   S.drawer = id;
   if (id === 'bulldoze') setTool('bulldoze'); else if (id === 'road') setTool('road'); else if (id === 'land') setTool('land'); else if (id === 'zone') setTool('zone', 1); else setTool('select', null, true);
@@ -158,9 +159,15 @@ function setTool(mode, type, keepDrawer) {
   S.tool.mode = mode; S.tool.type = type || null; if (mode !== 'build') S.tool.rotSet = false;
   ptr.mode = null; ptr.down = false; hidePreview();
   if (mode === 'select' && !keepDrawer && S.drawer && !['res', 'com', 'ind', 'util', 'svc', 'rec', 'gov', 'lm', 'trans'].includes(S.drawer)) closeDrawer();
-  if (W.tFill) W.tFill.visible = S.political || mode === 'land' || mode === 'found';
+  tFillSync();
   if (W.grid) W.grid.visible = S.showGrid && ['build', 'road', 'land', 'bulldoze', 'zone'].includes(mode);
   if (S.drawer) refreshDrawer(); syncTools(); updateHover();
+}
+
+// your land is tinted while a build tool is active, so it is obvious where you can build
+function tFillSync() {
+  if (!W.tFill) return; const m = S.tool.mode, strong = S.political || m === 'land' || m === 'found';
+  W.tFill.visible = strong || m === 'road' || m === 'zone' || m === 'build'; terrFillMat.opacity = strong ? 0.36 : 0.22;
 }
 
 /* ---------------- info panel ---------------- */
@@ -278,7 +285,7 @@ function placeFrame(fr, x, z, w, d, col) { fr.visible = true; fr.scale.set(w, 1,
 const ray = new THREE.Raycaster(), GPLANE = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), _v2 = new THREE.Vector2(), _v3 = new THREE.Vector3();
 function groundAt(cx, cy) { _v2.set(cx / innerWidth * 2 - 1, -(cy / innerHeight) * 2 + 1); ray.setFromCamera(_v2, camera); const p = ray.ray.intersectPlane(GPLANE, _v3); return p ? { x: p.x, z: p.z } : null; }
 function tileAt(g) { if (!g) return null; const x = Math.floor(g.x + HALF), z = Math.floor(g.z + HALF); return inb(x, z) ? { x, z } : null; }
-const ptr = { down: false, btn: 0, sx: 0, sy: 0, x: 0, y: 0, moved: false, mode: null, g0: null, t0: null, touches: new Map(), pinch: null, lastPaint: -1 };
+const ptr = { down: false, btn: 0, sx: 0, sy: 0, x: 0, y: 0, moved: false, mode: null, g0: null, t0: null, touches: new Map(), pinch: null, lastPaint: -1, over: false };
 function buildAnchor(t, s) { return { x: t.x - Math.floor((s - 1) / 2), z: t.z - Math.floor((s - 1) / 2) }; }
 function linePath(a, b) {
   const L = []; if (!a || !b) return L; const dx = b.x - a.x, dz = b.z - a.z, xf = Math.abs(dx) >= Math.abs(dz);
@@ -291,7 +298,7 @@ function rectTiles(a, b) { const x0 = Math.min(a.x, b.x), x1 = Math.max(a.x, b.x
 function updateHover() {
   if (!S.started || ptr.pinch) return;
   const g = groundAt(ptr.x, ptr.y), t = tileAt(g), m = S.tool.mode, n = act();
-  hidePreview(); if (!t) return;
+  hidePreview(); if (!t || (!ptr.over && !ptr.down)) return;
   if (ptr.down && ptr.mode === 'drag' && ptr.t0) {
     if (m === 'road') {
       const L = linePath(ptr.t0, t); let cost = 0, cnt = 0, bad = 0; const cv = new THREE.Color();
@@ -325,7 +332,7 @@ function updateHover() {
     showTip(z ? (ok ? `<b>${ZONES[z].n}</b> · ${money(ZONE_FEE)}/tile` : `<span class="r">${owner[i] !== n.id ? 'Not your territory' : 'Cannot be zoned'}</span>`) : (ok ? '<b>Clear zone</b>' : '<span class="m">No zone</span>'));
   } else if (m === 'road' || m === 'land' || m === 'bulldoze') {
     const i = ix(t.x, t.z); let col = '#3ee0c8', tip = '';
-    if (m === 'road') { const ok = roadOK(i, n) || road[i]; col = ok ? '#3ee0c8' : '#fb7185'; tip = road[i] ? 'Road already here' : roadOK(i, n) ? `<b>${terr[i] <= 1 ? 'Bridge' : 'Road'}</b> · ${money(roadCostAt(i))}/tile` : `<span class="r">${owner[i] !== n.id ? 'Not your territory' : 'Cannot build here'}</span>`; }
+    if (m === 'road') { const ok = roadOK(i, n) || road[i]; col = ok ? '#3ee0c8' : '#fb7185'; tip = road[i] ? 'Road already here' : roadOK(i, n) ? `<b>${terr[i] <= 1 ? 'Bridge' : 'Road'}</b> · ${money(roadCostAt(i))}/tile` : `<span class="r">${owner[i] !== n.id ? 'Not your territory' : 'Cannot build here'}</span>${owner[i] !== n.id ? '<br><span class="m">Build inside the tinted area</span>' : ''}`; }
     else if (m === 'land') { const ok = owner[i] === -1; col = ok ? '#3ee0c8' : '#8fa4c6'; tip = ok ? `<b>Free land</b> · ${money(landPrice(terr[i], n))}` : `<span class="m">Owned by ${esc(S.nations[owner[i]].name)}</span>`; }
     else { col = '#fb7185'; const b = tileB[i] ? S.blds.get(tileB[i]) : null; if (b) { placeFrame(cursor, b.x, b.z, b.s, b.s, col); showTip(`Remove <b>${BT[b.type].n}</b>`); return; } tip = road[i] ? 'Remove road' : '<span class="m">Click / drag to clear</span>'; }
     placeFrame(cursor, t.x, t.z, 1, 1, col); showTip(tip);
@@ -355,12 +362,18 @@ function tryBuild(quiet) {
   if (d.uniq) { setTool('select', null, true); }
   if (S.drawer) refreshDrawer();
 }
+function notYours(outside, what) {
+  sfx('error');
+  if (outside) toast('Not your territory', `${what} can only go inside your border — your land is tinted. Buy more with Territory (L).`, 'bad', 'alert');
+  else toast('Cannot build here', 'Mountains and buildings block the way', 'bad', 'alert');
+}
 function commitDrag() {
   const t = tileAt(groundAt(ptr.x, ptr.y)) || ptr.t0, m = S.tool.mode, n = act(); if (!ptr.t0) return;
   if (m === 'road') {
-    let built = 0, spent = 0, broke = false;
-    for (const i of linePath(ptr.t0, t)) { if (road[i] || !roadOK(i, n)) continue; const c = roadCostAt(i); if (n.treasury < c) { broke = true; break; } n.treasury -= c; spent += c; placeRoad(i); built++; }
+    let built = 0, spent = 0, broke = false, outside = 0, blocked = 0;
+    for (const i of linePath(ptr.t0, t)) { if (road[i]) continue; if (!roadOK(i, n)) { if (owner[i] !== n.id) outside++; else blocked++; continue; } const c = roadCostAt(i); if (n.treasury < c) { broke = true; break; } n.treasury -= c; spent += c; placeRoad(i); built++; }
     if (built) { sfx('build'); bump('road', built); } if (broke) toast('Out of funds', 'Some road tiles were not built', 'bad', 'alert');
+    else if (!built && (outside || blocked)) { notYours(outside, 'Roads'); }
   } else if (m === 'bulldoze') {
     const R = rectTiles(ptr.t0, t), B = bulldozeTargets(R.L, n);
     for (const b of B.blds) removeBuilding(b); for (const i of B.roads) removeRoad(i);
@@ -372,6 +385,7 @@ function commitDrag() {
     buyTiles(L);
   } else if (m === 'zone') {
     const r = paintZoneTiles(rectTiles(ptr.t0, t).L, S.tool.type, n);
+    if (!r.c && S.tool.type) { const L = rectTiles(ptr.t0, t).L; if (L.some(i => owner[i] !== n.id)) notYours(1, 'Zones'); }
     if (r.c && S.tool.type) toast(`${ZONES[S.tool.type].n}: ${r.c} tiles`, `Permits ${money(r.cost)}`, 'info', 'zone'); else if (r.c) toast('Zone cleared', `${r.c} tiles`, 'info', 'zone');
   }
   if (S.drawer) refreshDrawer();
@@ -395,7 +409,7 @@ canvas.addEventListener('pointerdown', e => {
   if (!S.started) return; canvas.focus();
   if (e.pointerType === 'touch') { ptr.touches.set(e.pointerId, { x: e.clientX, y: e.clientY }); if (ptr.touches.size === 2) { ptr.down = false; ptr.mode = null; hidePreview(); const [a, b] = [...ptr.touches.values()]; ptr.pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), ang: Math.atan2(b.y - a.y, b.x - a.x), mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2, g: groundAt((a.x + b.x) / 2, (a.y + b.y) / 2) }; return; } }
   canvas.setPointerCapture(e.pointerId);
-  ptr.down = true; ptr.btn = e.button; ptr.sx = ptr.x = e.clientX; ptr.sy = ptr.y = e.clientY; ptr.moved = false; ptr.g0 = groundAt(e.clientX, e.clientY); ptr.lastPaint = -1;
+  ptr.down = true; ptr.over = true; ptr.btn = e.button; ptr.sx = ptr.x = e.clientX; ptr.sy = ptr.y = e.clientY; ptr.moved = false; ptr.g0 = groundAt(e.clientX, e.clientY); ptr.lastPaint = -1;
   if (e.button === 2) ptr.mode = 'pan';
   else if (e.button === 1 || (e.button === 0 && e.altKey)) ptr.mode = 'rot';
   else { const m = S.tool.mode; ptr.mode = (m === 'select' || m === 'found') ? 'clickpan' : m === 'build' ? 'build' : 'drag'; ptr.t0 = tileAt(ptr.g0); if (ptr.mode === 'build' && BT[S.tool.type].s === 1) { tryBuild(false); ptr.lastPaint = ptr.t0 ? ix(ptr.t0.x, ptr.t0.z) : -1; } }
@@ -411,7 +425,7 @@ canvas.addEventListener('pointermove', e => {
       applyCam(); const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2; if (ptr.pinch.g) { ptr.g0 = ptr.pinch.g; grabPan(mx, my); } return;
     }
   }
-  const dx = e.clientX - ptr.x, dy = e.clientY - ptr.y; ptr.x = e.clientX; ptr.y = e.clientY;
+  const dx = e.clientX - ptr.x, dy = e.clientY - ptr.y; ptr.x = e.clientX; ptr.y = e.clientY; ptr.over = true;
   if (ptr.down && Math.hypot(e.clientX - ptr.sx, e.clientY - ptr.sy) > 6) ptr.moved = true;
   if (ptr.down) {
     if (ptr.mode === 'pan' || (ptr.mode === 'clickpan' && ptr.moved)) { grabPan(e.clientX, e.clientY); return; }
@@ -431,7 +445,7 @@ function endPointer(e) {
   ptr.t0 = null; updateHover();
 }
 canvas.addEventListener('pointerup', endPointer); canvas.addEventListener('pointercancel', endPointer);
-canvas.addEventListener('pointerleave', () => { if (!ptr.down) hidePreview(); });
+canvas.addEventListener('pointerleave', () => { ptr.over = false; if (!ptr.down) hidePreview(); });
 canvas.addEventListener('wheel', e => {
   e.preventDefault(); if (!S.started) return;
   const nd = clamp(cam.gdist * Math.exp(e.deltaY * 0.0011), 7, 175), g = groundAt(e.clientX, e.clientY);

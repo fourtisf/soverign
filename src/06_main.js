@@ -251,7 +251,7 @@ function loop(now) {
     animBuildings(dt); updateCars(dt); updateRotors(dt);
   } else { cam.gyaw += dt * 0.04; }
   updateParticles(dt); updateCam(dt); updateSky(dt); updateShadowCam(); updateClouds(dt); realTick(dt);
-  if (S.terrDirty) { rebuildTerritory(); if (W.tFill) W.tFill.visible = S.political || S.tool.mode === 'land' || S.tool.mode === 'found'; }
+  if (S.terrDirty) { rebuildTerritory(); tFillSync(); }
   updateLabels(dt);
   if (S.started) {
     uiT += Math.min(1, raw); if (uiT > 0.25) { uiT = 0; renderStats(); renderTime(); renderTracker(); renderRCI(); renderChips(); tutTick(); pumpModal(); if (S.selected && S.selected.b) renderInfoLive(); }

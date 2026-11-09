@@ -134,6 +134,7 @@ The terrain is regenerated from `seed`, so only deltas are stored. A typical sav
 
 ### 3.11 Tutorial (v0.4.2)
 - `src/05f_tutorial.js`: `TUT` steps (title, text, `target` selector to highlight, `go` for "Show me", `prog(base)` → [current, needed] or `next` for a manual step, reward `r`). `S.tut = {on, i, base}` is saved. It starts automatically on a new game. The step card replaces the Agenda in `#track` (`renderTracker` → `renderTutCard`). A pulsing `#tutRing` follows the target button, and on phones the toolbar scrolls to show it. `tutTick()` runs on the UI tick. Progress uses snapshots of the counters taken when each step starts (roads, player-built buildings, zone tiles, camera goal). Settings has "Restart tutorial".
+- Build feedback (v0.4.3): while a road, zone or building tool is active, `tFillSync()` tints every nation's territory (lighter than the political view), so players can see where they may build. A road or zone drag that builds nothing shows a "Not your territory" / "Cannot build here" toast (`notYours`). Picking a tool closes the info panel. The hover tip only shows while the pointer is over the map (`ptr.over`). On short laptop screens (height ≤ 900/740/660/610 px), CSS tiers shrink the left toolbar, right menu and drawer cards so everything stays on screen and the toolbar never overlaps the nation card.
 
 ## 4. Balance knobs (where to tune)
 
