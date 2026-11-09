@@ -132,6 +132,9 @@ The terrain is regenerated from `seed`, so only deltas are stored. A typical sav
 - **Worlds** (`WORLDS`, `S.world`, saved): `standard` (starter city + 3 AI nations) or `empty` / *Blank Slate*: no AI nations, no starter city, no roads, and trees cleared from the starting territory. Starting money is the same. With no housing at all, residential demand is fixed high (`demand()`) so zoning can start. Diplomacy explains that there are no other nations.
 - **Wallets** (`src/05e_wallet.js`): EIP-6963 discovery (fallback `window.ethereum`), several linked wallets stored per device in `localStorage['cityhood_wallets']` (`{list:[{address,rdns,name}], active}`), active wallet, `wallet_switchEthereumChain` with a `wallet_addEthereumChain` fallback (4902) for the chains in `EVM_CHAINS`, native balance via `eth_getBalance`, silent restore with `eth_accounts`. Removing the last address of a wallet tries `wallet_revokePermissions`. On a phone without an injected wallet the dialog offers a MetaMask deep link. It is read-only: nothing is signed or sent. Linking wallets to saves, leaderboards or on-chain rewards would need a backend and signature verification (Phase 3).
 
+### 3.11 Tutorial (v0.4.2)
+- `src/05f_tutorial.js`: `TUT` steps (title, text, `target` selector to highlight, `go` for "Show me", `prog(base)` → [current, needed] or `next` for a manual step, reward `r`). `S.tut = {on, i, base}` is saved. It starts automatically on a new game. The step card replaces the Agenda in `#track` (`renderTracker` → `renderTutCard`). A pulsing `#tutRing` follows the target button, and on phones the toolbar scrolls to show it. `tutTick()` runs on the UI tick. Progress uses snapshots of the counters taken when each step starts (roads, player-built buildings, zone tiles, camera goal). Settings has "Restart tutorial".
+
 ## 4. Balance knobs (where to tune)
 
 | What | Where | Current |

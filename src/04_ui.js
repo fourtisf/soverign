@@ -694,7 +694,7 @@ function openSettings() {
     html: `<div class="grid2" style="align-items:start"><div>${tg('dayNight', 'Day & night cycle', 'City lights turn on at night')}${tg('sfx', 'Sound effects', 'Clicks, building & income sounds')}${tg('music', 'Background music', 'Ambient music that shifts during a crisis')}${tg('showGrid', 'Grid while building', 'Helps keep your city tidy')}${tg('disasters', 'Natural disasters', 'Fires, earthquakes, tidal floods & storms')}
       <span class="flbl">Graphics quality</span><div class="row" id="sGfx" style="gap:6px">${Object.keys(GFX).map(q => `<button class="btn sm f1 ${S.gfx === q ? 'pri' : ''}" data-q="${q}">${GFX[q].n}</button>`).join('')}</div><div class="ms" style="margin-top:6px">Pick Low if your phone feels slow or hot.</div>
       <span class="flbl">Saves</span><div class="btns" style="margin-top:0"><button class="btn pri f1" id="sSave">${ico('save')} Save</button><button class="btn f1" id="sExp">${ico('download')} Export</button><button class="btn f1" id="sImp">${ico('upload')} Import</button></div>
-      <div class="btns"><button class="btn f1" id="sNew">${ico('plus')} New game</button></div>
+      <div class="btns"><button class="btn f1" id="sTut">${ico('target')} Restart tutorial</button><button class="btn f1" id="sNew">${ico('plus')} New game</button></div>
       <div class="ms" style="margin-top:8px">Mode: <b>${MODES[S.mode]?.n || ''}</b> · Difficulty: <b>${dif().n}</b></div></div>
       <div class="box"><div class="lb" style="margin-bottom:6px">Controls</div><div class="lst" style="font-size:12px">
       <div class="kv"><span>Pan map</span><span>Right-click + drag · WASD</span></div><div class="kv"><span>Rotate / tilt</span><span>Middle-click · Alt + drag · Q / E</span></div>
@@ -705,6 +705,7 @@ function openSettings() {
       box.querySelectorAll('[data-q]').forEach(b => b.onclick = () => { applyGfx(b.dataset.q); box.querySelectorAll('[data-q]').forEach(x => x.classList.toggle('pri', x === b)); toast(`Graphics: ${GFX[S.gfx].n}`, '', 'info', 'gear'); });
       box.querySelector('#sSave').onclick = () => saveGame(false);
       box.querySelector('#sExp').onclick = exportSave; box.querySelector('#sImp').onclick = importSave;
+      box.querySelector('#sTut').onclick = () => { closeModal(); tutStart(); toast('Tutorial restarted', 'Follow the steps at the top left', 'info', 'target'); };
       box.querySelector('#sNew').onclick = () => modal({ title: 'Start a new game?', sub: 'Your current progress stays saved until you start a new nation from the title screen.', icon: 'alert', buttons: [{ l: 'Cancel' }, { l: 'To title screen', dan: 1, f: () => { saveGame(true); location.reload(); } }] });
     }
   });

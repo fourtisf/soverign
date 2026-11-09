@@ -309,6 +309,9 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bac
 .wdot{display:inline-block;width:9px;height:9px;border-radius:50%;flex:none}
 .wgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
 .wpick{justify-content:flex-start;height:46px}.wpick img{width:22px;height:22px;border-radius:6px}.wpick svg{width:20px;height:20px}
+#tutRing{position:fixed;z-index:7;pointer-events:none;border:3px solid var(--acc);border-radius:14px;box-shadow:0 0 0 4px rgba(62,224,200,.22),0 0 26px rgba(62,224,200,.65);animation:tutpulse 1.2s ease-in-out infinite;display:none}
+@keyframes tutpulse{50%{box-shadow:0 0 0 9px rgba(62,224,200,.08),0 0 34px rgba(62,224,200,.9);transform:scale(1.03)}}
+.tut p{font-size:12.5px;line-height:1.45;margin:6px 0 0;color:var(--txt)}
 @keyframes gpulse{50%{box-shadow:0 0 0 4px rgba(251,113,133,.16)}}
 @media (max-width:1100px){#gchips{max-width:calc(100vw - 420px)}}
 @media (max-width:820px){#gchips{top:auto;bottom:126px;max-width:calc(100vw - 16px)}.gc{height:26px;font-size:10.5px}}

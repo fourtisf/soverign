@@ -91,6 +91,7 @@ function misGo(m) {
 }
 function renderTracker() {
   const el = $('#track'); if (!el || !S.started) return;
+  if (tutOn()) return renderTutCard(el);
   const list = activeMissions(), ch = curChapter(), key = list.map(m => m.id).join(',') + '|' + S.trackOpen + '|' + ch;
   if (key !== trackKey) {
     trackKey = key;

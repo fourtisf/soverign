@@ -98,7 +98,7 @@ function saveGame(silent) {
       diff: S.diff, mode: S.mode, world: S.world || 'standard', over: S.over, won: S.won, ended: S.ended, zones: rle(zone), evq: S.evq, evRecent: S.evRecent, st: S.st,
       nations: S.nations.map(n => { const o = {}; for (const k of NKEYS) o[k] = n[k]; return o; }),
       blds: [...S.blds.values()].map(b => [b.type, b.x, b.z, b.rot, b.nid, b.level, b.v, Math.round(b.occ), +b.prog.toFixed(3), +b.happy.toFixed(3), b.dmg || 0]),
-      wx: S.wx, feed: S.feed.slice(0, 30), eidUntil: S.eidUntil || 0,
+      wx: S.wx, feed: S.feed.slice(0, 30), eidUntil: S.eidUntil || 0, tut: S.tut || null,
       opts: { dayNight: S.dayNight, sfx: S.sfx, showGrid: S.showGrid, trackOpen: S.trackOpen, music: S.music, disasters: S.disasters }, mis: S.mis, cnt: S.cnt, unl: S.unl,
     };
     localStorage.setItem(SAVE_KEY, JSON.stringify(data));
@@ -114,6 +114,7 @@ function loadGame(data) {
   Object.assign(S, data.opts || {}); S.mis = data.mis || []; S.cnt = Object.assign({ road: 0, land: 0, up: 0, trade: 0, b: {} }, data.cnt || {}); S.unl = Object.assign({ diplo: false, found: false }, data.unl || {});
   S.diff = DIFF[data.diff] ? data.diff : 'normal'; S.mode = MODES[data.mode] ? data.mode : 'career'; S.world = WORLDS[data.world] ? data.world : 'standard';
   S.over = data.over || null; S.won = data.won || null; S.ended = data.ended || null;
+  S.tut = data.tut && typeof data.tut === 'object' ? data.tut : { on: false, i: 0 };
   S.wx = data.wx || null; S.feed = Array.isArray(data.feed) ? data.feed : []; S.eidUntil = data.eidUntil || 0;
   S.evq = data.evq || []; S.evRecent = data.evRecent || []; S.st = Object.assign({ months: 0, apprSum: 0, peak: 0, greenM: 0, relSum: 0 }, data.st || {});
   if (data.zones) zone = Uint8Array.from(unrle(data.zones, MAP * MAP), v => v > 0 && v <= 3 ? v : 0);
@@ -163,6 +164,7 @@ function enterGame(fresh) {
   if (S.music) setMusic(true);
   const n = act(); flyTo(n.capital.x, n.capital.z, 34); cam.gpitch = 0.86;
   if (fresh) {
+    tutStart();
     const facilities = ['Presidential Palace', 'School', 'Clinic', 'Police Station', 'Fire Station', 'Water Tower ×2', 'Solar Farm', 'Wind Turbine ×3', 'City Park ×2', '4 Apartments', '16 Houses', '5 Shophouses', 'Farm', 'Road network'];
     setTimeout(() => modal({
       title: `Welcome to office, ${esc(presName())}!`, sub: `You now officially lead ${esc(n.name)}. The people are waiting for you to make your mark.`, icon: 'crown', wide: 1,
@@ -175,7 +177,7 @@ function enterGame(fresh) {
       <div class="kv"><span>4 · Reach milestones</span><span>Earn grants and unlock new buildings (mall, airport, tower…)</span></div>
       <div class="kv"><span>5 · Focus on your nation first</span><span>${S.world === 'empty' ? 'There are no other nations in this world. New nations of your own unlock at 25,000 population' : 'Diplomacy unlocks at 5,000 population, new nations at 25,000'}</span></div>
       ${career() ? `<div class="kv"><span>6 · Career Mode · ${dif().n}</span><span>The people demand progress. You lose if you go bankrupt, are impeached or lose an election. Win by becoming a <b>Superpower</b></span></div>` : `<div class="kv"><span>6 · Sandbox Mode</span><span>No game over — build however you like</span></div>`}</div>
-      <div class="box" style="margin-top:12px;display:flex;gap:10px;align-items:center"><div class="tri">${ico('target')}</div><div style="font-size:12.5px"><b>Follow the Agenda</b> at the top left — step-by-step goals with cash rewards. Click a goal to start building right away.</div></div>`,
+      <div class="box" style="margin-top:12px;display:flex;gap:10px;align-items:center"><div class="tri">${ico('target')}</div><div style="font-size:12.5px">A short <b>tutorial</b> at the top left walks you through your first city, step by step, with cash rewards. After that the <b>Agenda</b> takes over with bigger goals.</div></div>`,
       buttons: [{ l: `${ico('play')} Start governing`, pri: 1 }]
     }), 900);
   } else if (S.over) { S.paused = true; queueModal(showGameOver); }
@@ -252,7 +254,7 @@ function loop(now) {
   if (S.terrDirty) { rebuildTerritory(); if (W.tFill) W.tFill.visible = S.political || S.tool.mode === 'land' || S.tool.mode === 'found'; }
   updateLabels(dt);
   if (S.started) {
-    uiT += Math.min(1, raw); if (uiT > 0.25) { uiT = 0; renderStats(); renderTime(); renderTracker(); renderRCI(); renderChips(); pumpModal(); if (S.selected && S.selected.b) renderInfoLive(); }
+    uiT += Math.min(1, raw); if (uiT > 0.25) { uiT = 0; renderStats(); renderTime(); renderTracker(); renderRCI(); renderChips(); tutTick(); pumpModal(); if (S.selected && S.selected.b) renderInfoLive(); }
     if (S.zoneDirty) rebuildZones();
     if (S.dmgDirty) { S.dmgDirty = false; paintOverlay(); }
     pbT += dt; if (pbT > 0.6) { pbT = 0; updateProblems(); }
@@ -285,6 +287,7 @@ async function init() {
   setTimeout(() => { $('#loading').style.opacity = 0; setTimeout(() => $('#loading').remove(), 650); renderTitle(); }, 250);
   if (new URLSearchParams(location.search).has('debug')) window.__game = { THREE, camera, checkSite, touchesRoad, setOverlay, checkUnlocks, S, act, placeBuilding, placeRoad, simDay, BT, cam, setTool, pickCat, openStats, openDiplo, openPolicy, openNations, owner: () => owner, terr: () => terr, ix, newGame, flyTo,
     realDay, voiceTick, calendarDay, econMonth, gdpGrowth, WX, wxDay, syncPlanes, syncShips, planes, ships, living: () => ({ bus: busM, ped: pedM }), districtAt, fireworks, trafficFactor, retargetLiving, priceNow, budOf, feedHTML,
+    tutStart, tutEnd, tutTick, TUT, tutOn,
     WAL, walletConnect, walletSwitchChain, walletRefresh, walletRemove, openWallet,
     aiAct, animBuildings, autoUpgrade, zoneDev, paintZoneTiles, zone: () => zone, runDisaster, DISASTERS, damageB, repairB, EVENTS, runEvent, gameOver, checkEndings, victoryState, scoreOf, styleOf, ranking, natMods, demand, saveGame, readSave, loadGame, applyGfx, setMusic, MUS, aiDiplomacy, tariffEvent, demandEvent, queueModal, pumpModal, DIFF, monthEnd, nationFails, foundNation: (t, nm) => foundNation(t, nm, '#ec4899', 1), playerNations };
 }

@@ -1,6 +1,6 @@
 {
   "name": "cityhood",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "private": true,
   "description": "Cityhood — 3D city & nation builder (single-file Three.js prototype)",
   "type": "module",
