@@ -305,6 +305,10 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bac
 .fl{display:flex;flex-direction:column;gap:2px}
 .wxl svg{width:11px;height:11px;vertical-align:-1px;margin-right:4px}
 @media (max-width:820px){#feed{display:none}}
+.wav{flex:none;width:34px;height:34px;border-radius:50%;box-shadow:0 0 0 2px rgba(255,255,255,.12)}
+.wdot{display:inline-block;width:9px;height:9px;border-radius:50%;flex:none}
+.wgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
+.wpick{justify-content:flex-start;height:46px}.wpick img{width:22px;height:22px;border-radius:6px}.wpick svg{width:20px;height:20px}
 @keyframes gpulse{50%{box-shadow:0 0 0 4px rgba(251,113,133,.16)}}
 @media (max-width:1100px){#gchips{max-width:calc(100vw - 420px)}}
 @media (max-width:820px){#gchips{top:auto;bottom:126px;max-width:calc(100vw - 16px)}.gc{height:26px;font-size:10.5px}}
@@ -1856,9 +1860,9 @@ function renderTime() {
   tb.querySelectorAll('[data-s]').forEach(b => { const v = +b.dataset.s; b.classList.toggle('on', v === 0 ? S.paused : (!S.paused && S.speed === v)); });
 }
 function renderMenu() {
-  const M = [['nations', 'crown', 'My Nations'], ['diplo', 'globe', 'Diplomacy'], ['policy', 'scale', 'Policy & Budget'], ['stats', 'chart', 'Statistics & News'], ['save', 'save', 'Save'], ['settings', 'gear', 'Menu & Settings']];
+  const M = [['nations', 'crown', 'My Nations'], ['diplo', 'globe', 'Diplomacy'], ['policy', 'scale', 'Policy & Budget'], ['stats', 'chart', 'Statistics & News'], ['wallet', 'wallet', 'Wallets (EVM)'], ['save', 'save', 'Save'], ['settings', 'gear', 'Menu & Settings']];
   $('#menu').innerHTML = M.map(m => { const lk = m[0] === 'diplo' && !S.unl.diplo; return `<button class="mbtn" data-m="${m[0]}" data-tip="${m[2]}${lk ? ' · unlocks at ' + fmtPop(UNL.diplo) + ' population' : ''}">${ico(m[1])}${lk ? `<span class="lkd">${ico('lock', 2.6)}</span>` : ''}</button>`; }).join('');
-  $('#menu').querySelectorAll('[data-m]').forEach(b => b.onclick = () => { sfx('click'); ({ nations: openNations, diplo: openDiplo, policy: openPolicy, stats: openStats, save: () => saveGame(false), settings: openSettings })[b.dataset.m](); });
+  $('#menu').querySelectorAll('[data-m]').forEach(b => b.onclick = () => { sfx('click'); ({ nations: openNations, diplo: openDiplo, policy: openPolicy, stats: openStats, wallet: openWallet, save: () => saveGame(false), settings: openSettings })[b.dataset.m](); });
   $('#nationCard').onclick = () => { sfx('click'); openNations(); };
 }
 function renderTools() {
@@ -2208,7 +2212,8 @@ canvas.addEventListener('wheel', e => {
 }, { passive: false });
 const keys = new Set();
 addEventListener('keydown', e => {
-  if (e.target.tagName === 'INPUT') return; const k = e.key.toLowerCase(); keys.add(k); if (!S.started) return;
+  if (e.target.tagName === 'INPUT') return; const k = e.key.toLowerCase(); keys.add(k);
+  if (!S.started) { if (k === 'escape' && !$('#modal').classList.contains('hidden') && !S.modalNoClose) closeModal(); return; }
   if (k === 'escape') { if (!$('#modal').classList.contains('hidden')) { if (!S.modalNoClose) closeModal(); } else if (S.tool.mode !== 'select') { setTool('select'); closeDrawer(); } else if (S.drawer) closeDrawer(); else if (S.overlay) setOverlay(S.overlay); else closeInfo(); }
   else if (!$('#modal').classList.contains('hidden')) return;
   else if (k === ' ') { e.preventDefault(); S.paused = !S.paused; renderTime(); }
@@ -2365,7 +2370,7 @@ function openDiplo() {
   }).join('');
   modal({
     title: 'International Diplomacy', sub: `Foreign relations of ${esc(me.name)} · GDP #${rankOf(me, 'gdp')} worldwide. Trade needs Relations ≥35, buying territory ≥50, Alliance ≥75 + trade partner. Relations <30 trigger tariffs, <22 sanctions.`, icon: 'globe', wide: 1,
-    html: `<div class="box" style="margin-bottom:10px;font-size:12px"><b>Defense:</b> ${hasDeterrence(me) ? '<span class="up">active</span> — aggressive nations think twice before claiming your territory.' : '<span class="dn">weak</span> — build a Military Base or enable Conscription to stop aggressive nations pressuring you.'}</div>` + rows,
+    html: (ais.length ? '' : '<div class="box" style="margin-bottom:10px;font-size:12.5px">There are no other nations in this world (Blank Slate). Found new nations of your own from the Territory tool.</div>') + `<div class="box" style="margin-bottom:10px;font-size:12px"><b>Defense:</b> ${hasDeterrence(me) ? '<span class="up">active</span> — aggressive nations think twice before claiming your territory.' : '<span class="dn">weak</span> — build a Military Base or enable Conscription to stop aggressive nations pressuring you.'}</div>` + rows,
     onRender: box => box.querySelectorAll('[data-a]').forEach(b => b.onclick = () => {
       const a = S.nations[+b.dataset.id], k = b.dataset.a;
       if (k === 'trade') { if (me.treasury < 1.5e6) return toast('Not enough funds', '', 'bad', 'alert'); me.treasury -= 1.5e6; me.trades.push(a.id); a.trades.push(me.id); bump('trade'); a.rel = Math.min(100, a.rel + 5); toast('Trade agreement signed', `${me.name} × ${a.name}`, 'gold', 'hand'); addNews(`${me.name} and ${a.name} signed a trade agreement.`); sfx('coin'); }
@@ -2593,7 +2598,8 @@ function renderTracker() {
 function demand(n) {
   const e = n.cap > 0 ? Math.max(0, (n.cap - n.pop) / n.cap) : 0, g = (n.jobs - n.workers) / Math.max(200, n.workers), u = n.unemp;
   let cj = 0, ij = 0; for (const b of n.list) { if (b.prog < 1) continue; const c = BT[b.type].c; if (c === 'com') cj += jobsOf(b); else if (c === 'ind') ij += jobsOf(b); }
-  const R = clamp(0.3 + g * 0.8 - e * 1.8 + (n.happy - 0.55) * 0.8, 0, 1);
+  // with no housing at all (e.g. a Blank Slate start) people want homes first
+  const R = n.cap <= 0 ? 0.8 : clamp(0.3 + g * 0.8 - e * 1.8 + (n.happy - 0.55) * 0.8, 0, 1);
   const Cm = clamp(0.25 + (n.pop * 0.3 - cj) / Math.max(300, n.pop * 0.3) * 0.6 + u * 1.5 - Math.max(0, g) * 0.3, 0, 1);
   const In = clamp(0.2 + (n.pop * 0.22 - ij) / Math.max(250, n.pop * 0.22) * 0.6 + u * 1.2 - Math.max(0, g) * 0.3, 0, 1);
   return [R, Cm, In];
@@ -2718,6 +2724,7 @@ const DIFF = {
   normal: { n: 'Normal', d: 'A balanced challenge', cash: 1, upk: 1, dem: 0.8, demMax: 45, appLo: 25, crisis: 6, coal: 1, dis: 1, ai: 1, vic: 250e3, sc: 1 },
   hard: { n: 'Hard', d: 'Small budget, demanding citizens, aggressive neighbors', cash: 0.7, upk: 1.15, dem: 1.1, demMax: 55, appLo: 30, crisis: 4, coal: 0, dis: 1.5, ai: 1.5, vic: 400e3, sc: 1.5 },
 };
+const WORLDS = { standard: { n: 'Standard', d: 'Starter city & neighbouring nations' }, empty: { n: 'Blank Slate', d: 'Empty, tidy land — just money' } };
 const MODES = { career: { n: 'Career', d: 'Victory & defeat are possible' }, sandbox: { n: 'Sandbox', d: 'Relaxed, no game over' } };
 const TERM_MONTHS = 240;                       // 20-year tenure (4 terms)
 const dif = () => DIFF[S.diff] || DIFF.normal;
@@ -3431,7 +3438,7 @@ function renderChips() {
   let el = $('#gchips'); if (!el) { el = document.createElement('div'); el.id = 'gchips'; $('#hud').appendChild(el); }
   const n = act(); if (!n) return; const D = dif(), ch = [];
   ch.push(`<button class="gc" data-g="goal">${ico(career() ? 'trophy' : 'sparkle')}${career() ? 'Career' : 'Sandbox'} · ${D.n}</button>`);
-  ch.push(wxChip());
+  ch.push(wxChip(), walletChip());
   if (career() && (n.dem || 0) >= 5) ch.push(`<button class="gc ${n.dem >= 25 ? 'bad' : 'wa'}" data-g="dem">${ico('users')}Public demand ${Math.round(n.dem)}</button>`);
   if (career() && n.debtM) ch.push(`<button class="gc bad" data-g="pol">${ico('coins')}Deficit ${n.debtM}/${D.crisis} mo</button>`);
   if (career() && n.lowM) ch.push(`<button class="gc bad" data-g="goal">${ico('alert')}No-confidence ${n.lowM}/6</button>`);
@@ -3444,6 +3451,7 @@ function renderChips() {
   el.querySelectorAll('[data-g]').forEach(b => b.onclick = () => {
     sfx('click'); const g = b.dataset.g;
     if (g === 'wx') weatherModal();
+    else if (g === 'wallet') openWallet();
     else if (g === 'goal') openStats('goal'); else if (g === 'dem') demandModal(); else if (g === 'pol') openPolicy(); else if (g === 'diplo') openDiplo();
     else if (g === 'dmg') { const d = [...S.dmgSet].find(x => x.nid === n.id); if (d) { flyTo(d.x, d.z, 28); select({ b: d }); } }
   });
@@ -3839,6 +3847,147 @@ function realTick(dt) {
   updatePlanes(dt); updateShips(dt);
 }
 
+/* =====================================================================
+   WALLETS · EVM (EIP-6963 discovery, multiple linked wallets, chain switching)
+   Read-only: the game only reads addresses, chain and native balance.
+   It never asks for keys and never sends transactions.
+   ===================================================================== */
+Object.assign(I, {
+  wallet: '<path d="M4 7a2 2 0 0 1 2-2h12v4"/><path d="M4 7v11a2 2 0 0 0 2 2h14V9H6a2 2 0 0 1-2-2z"/><path d="M16 14.5h.01"/>',
+  copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/>',
+  link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
+});
+const EVM_CHAINS = [
+  { id: '0x1', n: 'Ethereum', sym: 'ETH', rpc: 'https://ethereum-rpc.publicnode.com', exp: 'https://etherscan.io', c: '#8c9eff' },
+  { id: '0x2105', n: 'Base', sym: 'ETH', rpc: 'https://mainnet.base.org', exp: 'https://basescan.org', c: '#3b82f6' },
+  { id: '0xa4b1', n: 'Arbitrum One', sym: 'ETH', rpc: 'https://arb1.arbitrum.io/rpc', exp: 'https://arbiscan.io', c: '#60a5fa' },
+  { id: '0xa', n: 'OP Mainnet', sym: 'ETH', rpc: 'https://mainnet.optimism.io', exp: 'https://optimistic.etherscan.io', c: '#fb7185' },
+  { id: '0x89', n: 'Polygon', sym: 'POL', rpc: 'https://polygon-rpc.com', exp: 'https://polygonscan.com', c: '#a78bfa' },
+  { id: '0x38', n: 'BNB Chain', sym: 'BNB', rpc: 'https://bsc-dataseed.binance.org', exp: 'https://bscscan.com', c: '#facc15' },
+  { id: '0xa86a', n: 'Avalanche', sym: 'AVAX', rpc: 'https://api.avax.network/ext/bc/C/rpc', exp: 'https://snowtrace.io', c: '#f87171' },
+  { id: '0xaa36a7', n: 'Sepolia (testnet)', sym: 'ETH', rpc: 'https://ethereum-sepolia-rpc.publicnode.com', exp: 'https://sepolia.etherscan.io', c: '#94a3b8' },
+];
+const WKEY = 'cityhood_wallets';
+const WAL = { found: new Map(), list: [], active: null, info: {}, bound: new Set() };   // found: rdns → { info, provider }
+const chainOf = id => EVM_CHAINS.find(c => c.id === String(id).toLowerCase()) || { id, n: `Chain ${parseInt(id, 16) || id}`, sym: 'ETH', c: '#94a3b8' };
+const shortAddr = a => a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '';
+const validAddr = a => typeof a === 'string' && /^0x[0-9a-fA-F]{40}$/.test(a);
+const safeIcon = s => typeof s === 'string' && /^data:image\/(png|svg\+xml|webp|jpeg|gif);/i.test(s) ? s : '';
+function walletSave() { try { localStorage.setItem(WKEY, JSON.stringify({ list: WAL.list, active: WAL.active })); } catch (e) { } }
+function walletLoad() {
+  try { const d = JSON.parse(localStorage.getItem(WKEY) || 'null'); if (d && Array.isArray(d.list)) { WAL.list = d.list.filter(w => validAddr(w.address)).map(w => ({ address: w.address, rdns: String(w.rdns || 'injected'), name: String(w.name || 'Wallet') })); WAL.active = WAL.list.some(w => w.address === d.active) ? d.active : (WAL.list[0]?.address || null); } } catch (e) { }
+}
+function fmtUnits(hex, dec = 18) {
+  try { const v = BigInt(hex), base = 10n ** BigInt(dec), whole = v / base, frac = (v % base).toString().padStart(dec, '0').slice(0, 4).replace(/0+$/, ''); return whole.toLocaleString('en-US') + (frac ? '.' + frac : ''); } catch (e) { return '—'; }
+}
+function walletAvatar(a) { const h = hashStr(a.toLowerCase()); return `linear-gradient(135deg, hsl(${h % 360} 75% 60%), hsl(${(h >> 9) % 360} 70% 45%))`; }
+/* discovery: EIP-6963 announcements, plus the legacy window.ethereum as a fallback */
+function walletDiscover() {
+  addEventListener('eip6963:announceProvider', e => {
+    const d = e.detail; if (!d || !d.provider || !d.info) return;
+    const rdns = String(d.info.rdns || d.info.uuid || 'unknown');
+    WAL.found.set(rdns, { info: { name: String(d.info.name || 'Wallet').slice(0, 40), icon: safeIcon(d.info.icon), rdns }, provider: d.provider });
+    walletBind(rdns);
+  });
+  dispatchEvent(new Event('eip6963:requestProvider'));
+  setTimeout(() => {
+    if (!WAL.found.size && window.ethereum) { WAL.found.set('injected', { info: { name: window.ethereum.isMetaMask ? 'MetaMask' : 'Browser wallet', icon: '', rdns: 'injected' }, provider: window.ethereum }); walletBind('injected'); }
+    walletRestore();
+  }, 400);
+}
+function walletBind(rdns) {
+  const w = WAL.found.get(rdns); if (!w || WAL.bound.has(rdns) || typeof w.provider.on !== 'function') return; WAL.bound.add(rdns);
+  w.provider.on('accountsChanged', () => walletRefresh());
+  w.provider.on('chainChanged', () => walletRefresh());
+}
+async function walletReq(rdns, method, params) { const w = WAL.found.get(rdns); if (!w) throw new Error('Wallet not detected'); return w.provider.request(params ? { method, params } : { method }); }
+async function walletRestore() { if (WAL.list.length) await walletRefresh(); }
+// read chain + balance of every linked wallet whose extension is present (eth_accounts never opens a popup)
+async function walletRefresh() {
+  for (const w of WAL.list) {
+    const info = WAL.info[w.address] = WAL.info[w.address] || {};
+    if (!WAL.found.has(w.rdns)) { info.status = 'missing'; continue; }
+    try {
+      const accs = (await walletReq(w.rdns, 'eth_accounts')).map(a => a.toLowerCase());
+      info.status = accs.includes(w.address.toLowerCase()) ? 'ok' : 'locked';
+      info.chain = await walletReq(w.rdns, 'eth_chainId');
+      info.bal = info.status === 'ok' ? await walletReq(w.rdns, 'eth_getBalance', [w.address, 'latest']) : null;
+    } catch (e) { info.status = 'error'; }
+  }
+  if (S.started) renderChips();
+  if ($('#wPanel')) renderWalletPanel();
+}
+function walletErr(e) {
+  const c = e && e.code;
+  if (c === 4001) toast('Request rejected', 'You declined the request in your wallet', 'wa', 'wallet');
+  else if (c === -32002) toast('Check your wallet', 'A request is already waiting for your approval', 'wa', 'wallet');
+  else toast('Wallet error', (e && e.message ? String(e.message) : 'Unknown error').slice(0, 90), 'bad', 'alert');
+}
+async function walletConnect(rdns) {
+  try {
+    const accs = await walletReq(rdns, 'eth_requestAccounts'), name = WAL.found.get(rdns).info.name; let added = 0;
+    for (const a of accs || []) { if (!validAddr(a)) continue; if (!WAL.list.some(w => w.address.toLowerCase() === a.toLowerCase())) { WAL.list.push({ address: a, rdns, name }); added++; } if (!WAL.active) WAL.active = a; }
+    if (accs && accs[0] && validAddr(accs[0]) && added) WAL.active = WAL.list.find(w => w.address.toLowerCase() === accs[0].toLowerCase()).address;
+    walletSave(); sfx('coin');
+    toast(added ? `${name} connected` : 'Already linked', added ? `${added} address${added > 1 ? 'es' : ''} linked · ${shortAddr(WAL.active)}` : 'This wallet address is already in your list', 'info', 'wallet');
+    await walletRefresh();
+  } catch (e) { walletErr(e); }
+}
+async function walletSwitchChain(chainId) {
+  const w = WAL.list.find(x => x.address === WAL.active); if (!w) return toast('No active wallet', 'Connect a wallet first', 'wa', 'wallet');
+  const ch = chainOf(chainId);
+  try { await walletReq(w.rdns, 'wallet_switchEthereumChain', [{ chainId }]); }
+  catch (e) {
+    if (e && (e.code === 4902 || e?.data?.originalError?.code === 4902) && ch.rpc) {
+      try { await walletReq(w.rdns, 'wallet_addEthereumChain', [{ chainId, chainName: ch.n, nativeCurrency: { name: ch.sym, symbol: ch.sym, decimals: 18 }, rpcUrls: [ch.rpc], blockExplorerUrls: [ch.exp] }]); }
+      catch (e2) { return walletErr(e2); }
+    } else return walletErr(e);
+  }
+  toast(`Switched to ${ch.n}`, shortAddr(w.address), 'info', 'wallet'); await walletRefresh();
+}
+async function walletRemove(addr) {
+  const w = WAL.list.find(x => x.address === addr); if (!w) return;
+  WAL.list = WAL.list.filter(x => x.address !== addr); delete WAL.info[addr];
+  if (WAL.active === addr) WAL.active = WAL.list[0]?.address || null;
+  if (!WAL.list.some(x => x.rdns === w.rdns)) { try { await walletReq(w.rdns, 'wallet_revokePermissions', [{ eth_accounts: {} }]); } catch (e) { } }
+  walletSave(); toast('Wallet removed', shortAddr(addr), 'info', 'wallet'); if (S.started) renderChips(); renderWalletPanel();
+}
+/* UI */
+function walletChip() {
+  const w = WAL.list.find(x => x.address === WAL.active); if (!w) return '';
+  const i = WAL.info[w.address] || {}, ch = i.chain ? chainOf(i.chain) : null;
+  return `<button class="gc" data-g="wallet" title="${esc(w.name)} · ${esc(w.address)}"><span class="wdot" style="background:${walletAvatar(w.address)}"></span>${shortAddr(w.address)}${ch ? ` · ${esc(ch.n.replace(' (testnet)', ''))}` : ''}</button>`;
+}
+function renderWalletPanel() {
+  const el = $('#wPanel'); if (!el) return;
+  const act = WAL.list.find(x => x.address === WAL.active), ai = act ? WAL.info[act.address] || {} : {};
+  const rows = WAL.list.map(w => {
+    const i = WAL.info[w.address] || {}, ch = i.chain ? chainOf(i.chain) : null, on = w.address === WAL.active;
+    const st = i.status === 'ok' ? (i.bal != null ? `${fmtUnits(i.bal)} ${ch ? ch.sym : ''}` : '…') : i.status === 'missing' ? '<span class="dn">wallet not detected</span>' : i.status === 'locked' ? '<span class="dn">locked — open your wallet</span>' : i.status === 'error' ? '<span class="dn">unavailable</span>' : '…';
+    return `<div class="nrow ${on ? 'act' : ''}"><span class="wav" style="background:${walletAvatar(w.address)}"></span><div style="min-width:0;flex:1"><div class="nn">${esc(w.name)} ${on ? '<span class="badge">Active</span>' : ''}</div><div class="ns num">${shortAddr(w.address)}${ch ? ` · ${esc(ch.n)}` : ''} · ${st}</div></div>
+      <div class="na">${on ? '' : `<button class="btn sm pri" data-wact="${w.address}">Use</button>`}<button class="btn sm" data-wcopy="${w.address}" title="Copy address">${ico('copy')}</button>${ch && ch.exp ? `<a class="btn sm" href="${ch.exp}/address/${w.address}" target="_blank" rel="noopener" title="View on explorer">${ico('link')}</a>` : ''}<button class="btn sm dan" data-wdel="${w.address}" title="Remove">${ico('x')}</button></div></div>`;
+  }).join('') || '<div class="ms">No wallet linked yet.</div>';
+  const found = [...WAL.found.values()];
+  const picker = found.length ? found.map(f => `<button class="btn wpick" data-wcon="${esc(f.info.rdns)}">${f.info.icon ? `<img src="${f.info.icon}" alt="">` : ico('wallet')}<span>${esc(f.info.name)}</span></button>`).join('')
+    : `<div class="ms" style="margin-bottom:8px">No browser wallet detected. Install one (MetaMask, Rabby, Coinbase Wallet, OKX…) or, on a phone, open Cityhood inside your wallet app's browser.</div>
+       <div class="row" style="flex-wrap:wrap;gap:6px"><a class="btn sm pri" href="https://metamask.app.link/dapp/${esc(location.host + location.pathname)}" target="_blank" rel="noopener">${ico('wallet')} Open in MetaMask app</a><a class="btn sm" href="https://metamask.io/download/" target="_blank" rel="noopener">Get MetaMask</a><a class="btn sm" href="https://rabby.io/" target="_blank" rel="noopener">Get Rabby</a></div>`;
+  const chains = EVM_CHAINS.map(c => `<button class="btn sm ${ai.chain && c.id === String(ai.chain).toLowerCase() ? 'pri' : ''}" data-wchain="${c.id}" ${act ? '' : 'disabled'}><span class="wdot" style="background:${c.c}"></span>${esc(c.n)}</button>`).join('');
+  el.innerHTML = `<span class="flbl" style="margin-top:0">Linked wallets</span><div>${rows}</div>
+    <span class="flbl">Network${act ? ` · ${esc(act.name)}` : ''}</span><div class="row" style="flex-wrap:wrap;gap:6px">${chains}</div>
+    <span class="flbl">${WAL.list.length ? 'Add another wallet' : 'Connect a wallet'}</span><div class="wgrid">${picker}</div>`;
+  el.querySelectorAll('[data-wcon]').forEach(b => b.onclick = () => walletConnect(b.dataset.wcon));
+  el.querySelectorAll('[data-wact]').forEach(b => b.onclick = () => { WAL.active = b.dataset.wact; walletSave(); sfx('click'); if (S.started) renderChips(); renderWalletPanel(); walletRefresh(); });
+  el.querySelectorAll('[data-wdel]').forEach(b => b.onclick = () => walletRemove(b.dataset.wdel));
+  el.querySelectorAll('[data-wchain]').forEach(b => b.onclick = () => walletSwitchChain(b.dataset.wchain));
+  el.querySelectorAll('[data-wcopy]').forEach(b => b.onclick = () => { try { navigator.clipboard.writeText(b.dataset.wcopy); toast('Address copied', shortAddr(b.dataset.wcopy), 'info', 'copy'); } catch (e) { } });
+}
+function openWallet() {
+  modal({
+    title: 'Wallets · EVM', sub: 'Link one or more browser wallets. Cityhood only reads your address, network and balance — it never asks for keys and never sends transactions.', icon: 'wallet', wide: 1,
+    html: '<div id="wPanel"></div>', onRender: () => { renderWalletPanel(); dispatchEvent(new Event('eip6963:requestProvider')); setTimeout(renderWalletPanel, 300); walletRefresh(); }
+  });
+}
+
 
 /* =====================================================================
    CAMERA · SKY · LOOP · SAVE · TITLE
@@ -3936,7 +4085,7 @@ function saveGame(silent) {
   try {
     const data = {
       v: 3, seed: S.seed, president: S.president, day: S.day, active: S.active, cycle: S.cycle, owner: rle(owner), roads: [...S.roadSet], cleared: [...S.cleared], news: S.news.slice(0, 30),
-      diff: S.diff, mode: S.mode, over: S.over, won: S.won, ended: S.ended, zones: rle(zone), evq: S.evq, evRecent: S.evRecent, st: S.st,
+      diff: S.diff, mode: S.mode, world: S.world || 'standard', over: S.over, won: S.won, ended: S.ended, zones: rle(zone), evq: S.evq, evRecent: S.evRecent, st: S.st,
       nations: S.nations.map(n => { const o = {}; for (const k of NKEYS) o[k] = n[k]; return o; }),
       blds: [...S.blds.values()].map(b => [b.type, b.x, b.z, b.rot, b.nid, b.level, b.v, Math.round(b.occ), +b.prog.toFixed(3), +b.happy.toFixed(3), b.dmg || 0]),
       wx: S.wx, feed: S.feed.slice(0, 30), eidUntil: S.eidUntil || 0,
@@ -3953,7 +4102,7 @@ function loadGame(data) {
   owner = unrle(data.owner, MAP * MAP);
   S.president = data.president; S.day = data.day; S.cycle = data.cycle ?? 0.32; S.news = data.news || [];
   Object.assign(S, data.opts || {}); S.mis = data.mis || []; S.cnt = Object.assign({ road: 0, land: 0, up: 0, trade: 0, b: {} }, data.cnt || {}); S.unl = Object.assign({ diplo: false, found: false }, data.unl || {});
-  S.diff = DIFF[data.diff] ? data.diff : 'normal'; S.mode = MODES[data.mode] ? data.mode : 'career';
+  S.diff = DIFF[data.diff] ? data.diff : 'normal'; S.mode = MODES[data.mode] ? data.mode : 'career'; S.world = WORLDS[data.world] ? data.world : 'standard';
   S.over = data.over || null; S.won = data.won || null; S.ended = data.ended || null;
   S.wx = data.wx || null; S.feed = Array.isArray(data.feed) ? data.feed : []; S.eidUntil = data.eidUntil || 0;
   S.evq = data.evq || []; S.evRecent = data.evRecent || []; S.st = Object.assign({ months: 0, apprSum: 0, peak: 0, greenM: 0, relSum: 0 }, data.st || {});
@@ -3979,17 +4128,20 @@ function newGame(cfg) {
   if (cfg.seed !== S.seed || S.cleared.size) { S.cleared = new Set(); generateWorld(cfg.seed); }
   buildGrid();
   const cap = findCapital(0, 40) || findCapital(0);
-  S.diff = DIFF[cfg.diff] ? cfg.diff : 'normal'; S.mode = MODES[cfg.mode] ? cfg.mode : 'career';
+  S.diff = DIFF[cfg.diff] ? cfg.diff : 'normal'; S.mode = MODES[cfg.mode] ? cfg.mode : 'career'; S.world = WORLDS[cfg.world] ? cfg.world : 'standard';
+  const empty = S.world === 'empty';
   const p = makeNation({ name: cfg.name, color: cfg.color, fstyle: 0, treasury: 25e6 * dif().cash, capital: cap, approval: 66, founded: 0 });
   S.nations.push(p); claimCircle(p, cap.x, cap.z, 15);
   const aiCols = ['#fb923c', '#a855f7', '#f43f5e', '#facc15', '#ec4899', '#3b82f6'].filter(c => c !== cfg.color);
-  AI_DEFS.forEach((d, k) => {
+  if (!empty) AI_DEFS.forEach((d, k) => {
     const c = findCapital(58) || findCapital(46) || findCapital(32); if (!c) return;
     const n = makeNation({ ...d, ai: true, color: aiCols[k], treasury: 22e6 * (S.diff === 'hard' ? 1.2 : S.diff === 'easy' ? 0.85 : 1), capital: c, rel: 40 + Math.floor(Math.random() * 25), approval: 60 });
     S.nations.push(n); claimCircle(n, c.x, c.z, 12);
   });
   assignPersonalities();
-  for (const n of S.nations) starterCity(n, true);
+  // Blank Slate: no starter city, no neighbours — just money and land cleared of trees
+  if (empty) { for (let i = 0; i < MAP * MAP; i++) if (owner[i] === p.id) clearTrees(i); }
+  else for (const n of S.nations) starterCity(n, true);
   for (const n of S.nations) { simNation(n); n.popM = n.pop; }
   S.active = 0; addNews(`${presName()} is sworn in as leader of ${p.name}.`);
   enterGame(true);
@@ -4005,13 +4157,13 @@ function enterGame(fresh) {
     setTimeout(() => modal({
       title: `Welcome to office, ${esc(presName())}!`, sub: `You now officially lead ${esc(n.name)}. The people are waiting for you to make your mark.`, icon: 'crown', wide: 1,
       html: `<div class="grid3"><div class="box"><div class="lb">Starting treasury</div><div class="vl up">${money(n.treasury)}</div></div><div class="box"><div class="lb">Territory</div><div class="vl">${n.tiles} tiles</div></div><div class="box"><div class="lb">Population</div><div class="vl">${fmtPop(n.pop)}</div></div></div>
-      <span class="flbl">Facilities provided</span><div class="row" style="flex-wrap:wrap;gap:6px">${facilities.map(f => `<span class="pill ok">${f}</span>`).join('')}</div>
+      ${S.world === 'empty' ? '<span class="flbl">Blank Slate</span><div class="box" style="font-size:12.5px">Nothing is built yet — no roads, no homes, no neighbours. Your land has been cleared and tidied. Start with a road grid, then homes, jobs, power and water.</div>' : `<span class="flbl">Facilities provided</span><div class="row" style="flex-wrap:wrap;gap:6px">${facilities.map(f => `<span class="pill ok">${f}</span>`).join('')}</div>`}
       <span class="flbl">How to play</span><div class="lst" style="font-size:12.5px">
       <div class="kv"><span>1 · Build roads</span><span>Every building needs road access</span></div>
       <div class="kv"><span>2 · Homes + jobs</span><span>Homes attract citizens; shophouses & industry create jobs. Use <b>Zoning (Z)</b> so private developers build too</span></div>
       <div class="kv"><span>3 · Power, water & services</span><span>Keep up supply and school/hospital/police coverage</span></div>
       <div class="kv"><span>4 · Reach milestones</span><span>Earn grants and unlock new buildings (mall, airport, tower…)</span></div>
-      <div class="kv"><span>5 · Focus on your nation first</span><span>Diplomacy unlocks at 5,000 population, new nations at 25,000</span></div>
+      <div class="kv"><span>5 · Focus on your nation first</span><span>${S.world === 'empty' ? 'There are no other nations in this world. New nations of your own unlock at 25,000 population' : 'Diplomacy unlocks at 5,000 population, new nations at 25,000'}</span></div>
       ${career() ? `<div class="kv"><span>6 · Career Mode · ${dif().n}</span><span>The people demand progress. You lose if you go bankrupt, are impeached or lose an election. Win by becoming a <b>Superpower</b></span></div>` : `<div class="kv"><span>6 · Sandbox Mode</span><span>No game over — build however you like</span></div>`}</div>
       <div class="box" style="margin-top:12px;display:flex;gap:10px;align-items:center"><div class="tri">${ico('target')}</div><div style="font-size:12.5px"><b>Follow the Agenda</b> at the top left — step-by-step goals with cash rewards. Click a goal to start building right away.</div></div>`,
       buttons: [{ l: `${ico('play')} Start governing`, pri: 1 }]
@@ -4027,7 +4179,7 @@ function enterGame(fresh) {
   } else toast(`Welcome back, ${presName()}`, dateStr(S.day), 'info', 'crown');
 }
 function renderTitle() {
-  const save = readSave(); let col = NCOLORS[0], mode = 'career', diff = 'normal';
+  const save = readSave(); let col = NCOLORS[0], mode = 'career', diff = 'normal', world = 'standard';
   $('#title').innerHTML = `<div class="tp">
     <div class="kick">Nation Builder · 3D</div>
     <div class="logo">CITYHOOD</div>
@@ -4036,24 +4188,25 @@ function renderTitle() {
       <label class="flbl" style="margin-top:0">President name</label><input class="tinput" id="tPres" maxlength="24" placeholder="Your name">
       <label class="flbl">Nation name</label><input class="tinput" id="tNat" maxlength="32" value="Dawn Republic">
       <label class="flbl">Flag color</label><div class="swatch" id="tSw">${NCOLORS.map(c => `<button data-c="${c}" style="background:${c}" class="${c === col ? 'on' : ''}"></button>`).join('')}</div>
+      <label class="flbl">World</label><div class="seg" id="tWorld">${Object.keys(WORLDS).map(k => `<button data-v="${k}" class="${k === world ? 'on' : ''}"><b>${WORLDS[k].n}</b><small>${WORLDS[k].d}</small></button>`).join('')}</div>
       <label class="flbl">Mode</label><div class="seg" id="tMode">${Object.keys(MODES).map(k => `<button data-v="${k}" class="${k === mode ? 'on' : ''}"><b>${MODES[k].n}</b><small>${MODES[k].d}</small></button>`).join('')}</div>
       <label class="flbl">Difficulty</label><div class="seg s3" id="tDiff">${Object.keys(DIFF).map(k => `<button data-v="${k}" class="${k === diff ? 'on' : ''}"><b>${DIFF[k].n}</b><small>${DIFF[k].d}</small></button>`).join('')}</div>
       <label class="flbl">World seed</label><div class="seed"><input class="tinput num" id="tSeed" value="${S.seed}" inputmode="numeric"><button class="btn" id="tRoll" style="height:46px">${ico('rotate')} Random</button></div>
       <div class="trow"><button class="btn pri f1" id="tStart" style="height:48px">${ico('crown')} Start Governing</button>${save ? `<button class="btn" id="tCont" style="height:48px">${ico('play')} Continue</button>` : ''}</div>
       ${save ? `<div class="ms" style="margin-top:10px">Save: ${esc(save.nations?.[save.active]?.name || '')} · ${dateStr(save.day || 0)}${save.over ? ' · term ended' : ''}</div>` : ''}
-      <button class="btn sm" id="tImp" style="margin-top:10px">${ico('upload')} Import save (.json)</button>
+      <div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap"><button class="btn sm" id="tImp">${ico('upload')} Import save (.json)</button><button class="btn sm" id="tWal">${ico('wallet')} Connect wallet</button></div>
     </div>
     <div class="feat"><div>${ico('map')} 160×160 continent</div><div>${ico('home')} 38 building types</div><div>${ico('flag')} Multi-nation</div><div>${ico('sun')} Day & night</div></div>
   </div>`;
   $('#title').classList.remove('hidden');
   $('#tSw').querySelectorAll('[data-c]').forEach(b => b.onclick = () => { col = b.dataset.c; $('#tSw').querySelectorAll('[data-c]').forEach(x => x.classList.toggle('on', x === b)); });
   const seg = (id, set) => $(id).querySelectorAll('[data-v]').forEach(b => b.onclick = () => { set(b.dataset.v); $(id).querySelectorAll('[data-v]').forEach(x => x.classList.toggle('on', x === b)); sfx('click'); });
-  seg('#tMode', v => mode = v); seg('#tDiff', v => diff = v);
-  $('#tImp').onclick = importSave;
+  seg('#tMode', v => mode = v); seg('#tDiff', v => diff = v); seg('#tWorld', v => world = v);
+  $('#tImp').onclick = importSave; $('#tWal').onclick = () => { sfx('click'); openWallet(); };
   const reseed = v => { const s = (parseInt(v) >>> 0) || 1; if (s !== S.seed) { S.cleared = new Set(); generateWorld(s); } $('#tSeed').value = S.seed; };
   $('#tRoll').onclick = () => reseed(Math.floor(Math.random() * 1e6));
   $('#tSeed').onchange = e => reseed(e.target.value);
-  $('#tStart').onclick = () => { sfx('click'); reseed($('#tSeed').value); newGame({ president: ($('#tPres').value || '').trim(), name: ($('#tNat').value || '').trim() || 'Dawn Republic', color: col, seed: S.seed, mode, diff }); };
+  $('#tStart').onclick = () => { sfx('click'); reseed($('#tSeed').value); newGame({ president: ($('#tPres').value || '').trim(), name: ($('#tNat').value || '').trim() || 'Dawn Republic', color: col, seed: S.seed, mode, diff, world }); };
   const c = $('#tCont'); if (c) c.onclick = () => { sfx('click'); loadGame(save); };
 }
 
@@ -4089,7 +4242,7 @@ function loop(now) {
   if (S.terrDirty) { rebuildTerritory(); if (W.tFill) W.tFill.visible = S.political || S.tool.mode === 'land' || S.tool.mode === 'found'; }
   updateLabels(dt);
   if (S.started) {
-    uiT += dt; if (uiT > 0.25) { uiT = 0; renderStats(); renderTime(); renderTracker(); renderRCI(); renderChips(); pumpModal(); if (S.selected && S.selected.b) renderInfoLive(); }
+    uiT += Math.min(1, raw); if (uiT > 0.25) { uiT = 0; renderStats(); renderTime(); renderTracker(); renderRCI(); renderChips(); pumpModal(); if (S.selected && S.selected.b) renderInfoLive(); }
     if (S.zoneDirty) rebuildZones();
     if (S.dmgDirty) { S.dmgDirty = false; paintOverlay(); }
     pbT += dt; if (pbT > 0.6) { pbT = 0; updateProblems(); }
@@ -4108,7 +4261,7 @@ addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); ca
 /* ---------------- init ---------------- */
 async function init() {
   const prog = (p, t) => { $('#lprog').style.width = p + '%'; $('#ltxt').textContent = t; return new Promise(r => setTimeout(r, 30)); };
-  initGfx();
+  initGfx(); walletLoad(); walletDiscover();
   await prog(10, 'Shaping the continent…');
   const save = readSave(); S.seed = save ? save.seed : Math.floor(Math.random() * 1e6);
   if (save) S.cleared = new Set(save.cleared || []);
@@ -4122,6 +4275,7 @@ async function init() {
   setTimeout(() => { $('#loading').style.opacity = 0; setTimeout(() => $('#loading').remove(), 650); renderTitle(); }, 250);
   if (new URLSearchParams(location.search).has('debug')) window.__game = { THREE, camera, checkSite, touchesRoad, setOverlay, checkUnlocks, S, act, placeBuilding, placeRoad, simDay, BT, cam, setTool, pickCat, openStats, openDiplo, openPolicy, openNations, owner: () => owner, terr: () => terr, ix, newGame, flyTo,
     realDay, voiceTick, calendarDay, econMonth, gdpGrowth, WX, wxDay, syncPlanes, syncShips, planes, ships, living: () => ({ bus: busM, ped: pedM }), districtAt, fireworks, trafficFactor, retargetLiving, priceNow, budOf, feedHTML,
+    WAL, walletConnect, walletSwitchChain, walletRefresh, walletRemove, openWallet,
     aiAct, animBuildings, autoUpgrade, zoneDev, paintZoneTiles, zone: () => zone, runDisaster, DISASTERS, damageB, repairB, EVENTS, runEvent, gameOver, checkEndings, victoryState, scoreOf, styleOf, ranking, natMods, demand, saveGame, readSave, loadGame, applyGfx, setMusic, MUS, aiDiplomacy, tariffEvent, demandEvent, queueModal, pumpModal, DIFF, monthEnd, nationFails, foundNation: (t, nm) => foundNation(t, nm, '#ec4899', 1), playerNations };
 }
 init().catch(e => { console.error(e); $('#ltxt').textContent = 'Failed to load: ' + e.message; });

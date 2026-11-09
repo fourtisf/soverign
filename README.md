@@ -10,6 +10,8 @@ A 3D nation-builder that runs in the browser. You are the president: start with 
   - **Movement and weather:** buses, pedestrians, planes taking off and ships sailing to your ports; rush hour; tropical rainy and dry seasons with storms.
   - **Transport and people:** a Bus Terminal and a Metro Station (T); a citizens' feed with district names.
   - **Calendar and economy:** New Year, Independence Day and an Eid holiday that moves every year; inflation, real GDP growth, quarterly reports and ministry budgets.
+- **Worlds:** *Standard* (starter city and neighbouring nations) or *Blank Slate* (empty, tidy land — no roads, no buildings, no neighbours; just money).
+- **Wallets (EVM):** connect one or more browser wallets (MetaMask, Rabby, Coinbase Wallet, OKX… via EIP-6963), pick the active one, switch networks (Ethereum, Base, Arbitrum, OP, Polygon, BNB Chain, Avalanche, Sepolia) and see the native balance. Read-only: no keys, no transactions.
 - **Settings:** background music, graphics quality, and save export/import.
 
 ## Play

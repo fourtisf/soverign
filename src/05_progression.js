@@ -114,7 +114,8 @@ function renderTracker() {
 function demand(n) {
   const e = n.cap > 0 ? Math.max(0, (n.cap - n.pop) / n.cap) : 0, g = (n.jobs - n.workers) / Math.max(200, n.workers), u = n.unemp;
   let cj = 0, ij = 0; for (const b of n.list) { if (b.prog < 1) continue; const c = BT[b.type].c; if (c === 'com') cj += jobsOf(b); else if (c === 'ind') ij += jobsOf(b); }
-  const R = clamp(0.3 + g * 0.8 - e * 1.8 + (n.happy - 0.55) * 0.8, 0, 1);
+  // with no housing at all (e.g. a Blank Slate start) people want homes first
+  const R = n.cap <= 0 ? 0.8 : clamp(0.3 + g * 0.8 - e * 1.8 + (n.happy - 0.55) * 0.8, 0, 1);
   const Cm = clamp(0.25 + (n.pop * 0.3 - cj) / Math.max(300, n.pop * 0.3) * 0.6 + u * 1.5 - Math.max(0, g) * 0.3, 0, 1);
   const In = clamp(0.2 + (n.pop * 0.22 - ij) / Math.max(250, n.pop * 0.22) * 0.6 + u * 1.2 - Math.max(0, g) * 0.3, 0, 1);
   return [R, Cm, In];

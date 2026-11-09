@@ -95,7 +95,7 @@ function saveGame(silent) {
   try {
     const data = {
       v: 3, seed: S.seed, president: S.president, day: S.day, active: S.active, cycle: S.cycle, owner: rle(owner), roads: [...S.roadSet], cleared: [...S.cleared], news: S.news.slice(0, 30),
-      diff: S.diff, mode: S.mode, over: S.over, won: S.won, ended: S.ended, zones: rle(zone), evq: S.evq, evRecent: S.evRecent, st: S.st,
+      diff: S.diff, mode: S.mode, world: S.world || 'standard', over: S.over, won: S.won, ended: S.ended, zones: rle(zone), evq: S.evq, evRecent: S.evRecent, st: S.st,
       nations: S.nations.map(n => { const o = {}; for (const k of NKEYS) o[k] = n[k]; return o; }),
       blds: [...S.blds.values()].map(b => [b.type, b.x, b.z, b.rot, b.nid, b.level, b.v, Math.round(b.occ), +b.prog.toFixed(3), +b.happy.toFixed(3), b.dmg || 0]),
       wx: S.wx, feed: S.feed.slice(0, 30), eidUntil: S.eidUntil || 0,
@@ -112,7 +112,7 @@ function loadGame(data) {
   owner = unrle(data.owner, MAP * MAP);
   S.president = data.president; S.day = data.day; S.cycle = data.cycle ?? 0.32; S.news = data.news || [];
   Object.assign(S, data.opts || {}); S.mis = data.mis || []; S.cnt = Object.assign({ road: 0, land: 0, up: 0, trade: 0, b: {} }, data.cnt || {}); S.unl = Object.assign({ diplo: false, found: false }, data.unl || {});
-  S.diff = DIFF[data.diff] ? data.diff : 'normal'; S.mode = MODES[data.mode] ? data.mode : 'career';
+  S.diff = DIFF[data.diff] ? data.diff : 'normal'; S.mode = MODES[data.mode] ? data.mode : 'career'; S.world = WORLDS[data.world] ? data.world : 'standard';
   S.over = data.over || null; S.won = data.won || null; S.ended = data.ended || null;
   S.wx = data.wx || null; S.feed = Array.isArray(data.feed) ? data.feed : []; S.eidUntil = data.eidUntil || 0;
   S.evq = data.evq || []; S.evRecent = data.evRecent || []; S.st = Object.assign({ months: 0, apprSum: 0, peak: 0, greenM: 0, relSum: 0 }, data.st || {});
@@ -138,17 +138,20 @@ function newGame(cfg) {
   if (cfg.seed !== S.seed || S.cleared.size) { S.cleared = new Set(); generateWorld(cfg.seed); }
   buildGrid();
   const cap = findCapital(0, 40) || findCapital(0);
-  S.diff = DIFF[cfg.diff] ? cfg.diff : 'normal'; S.mode = MODES[cfg.mode] ? cfg.mode : 'career';
+  S.diff = DIFF[cfg.diff] ? cfg.diff : 'normal'; S.mode = MODES[cfg.mode] ? cfg.mode : 'career'; S.world = WORLDS[cfg.world] ? cfg.world : 'standard';
+  const empty = S.world === 'empty';
   const p = makeNation({ name: cfg.name, color: cfg.color, fstyle: 0, treasury: 25e6 * dif().cash, capital: cap, approval: 66, founded: 0 });
   S.nations.push(p); claimCircle(p, cap.x, cap.z, 15);
   const aiCols = ['#fb923c', '#a855f7', '#f43f5e', '#facc15', '#ec4899', '#3b82f6'].filter(c => c !== cfg.color);
-  AI_DEFS.forEach((d, k) => {
+  if (!empty) AI_DEFS.forEach((d, k) => {
     const c = findCapital(58) || findCapital(46) || findCapital(32); if (!c) return;
     const n = makeNation({ ...d, ai: true, color: aiCols[k], treasury: 22e6 * (S.diff === 'hard' ? 1.2 : S.diff === 'easy' ? 0.85 : 1), capital: c, rel: 40 + Math.floor(Math.random() * 25), approval: 60 });
     S.nations.push(n); claimCircle(n, c.x, c.z, 12);
   });
   assignPersonalities();
-  for (const n of S.nations) starterCity(n, true);
+  // Blank Slate: no starter city, no neighbours — just money and land cleared of trees
+  if (empty) { for (let i = 0; i < MAP * MAP; i++) if (owner[i] === p.id) clearTrees(i); }
+  else for (const n of S.nations) starterCity(n, true);
   for (const n of S.nations) { simNation(n); n.popM = n.pop; }
   S.active = 0; addNews(`${presName()} is sworn in as leader of ${p.name}.`);
   enterGame(true);
@@ -164,13 +167,13 @@ function enterGame(fresh) {
     setTimeout(() => modal({
       title: `Welcome to office, ${esc(presName())}!`, sub: `You now officially lead ${esc(n.name)}. The people are waiting for you to make your mark.`, icon: 'crown', wide: 1,
       html: `<div class="grid3"><div class="box"><div class="lb">Starting treasury</div><div class="vl up">${money(n.treasury)}</div></div><div class="box"><div class="lb">Territory</div><div class="vl">${n.tiles} tiles</div></div><div class="box"><div class="lb">Population</div><div class="vl">${fmtPop(n.pop)}</div></div></div>
-      <span class="flbl">Facilities provided</span><div class="row" style="flex-wrap:wrap;gap:6px">${facilities.map(f => `<span class="pill ok">${f}</span>`).join('')}</div>
+      ${S.world === 'empty' ? '<span class="flbl">Blank Slate</span><div class="box" style="font-size:12.5px">Nothing is built yet — no roads, no homes, no neighbours. Your land has been cleared and tidied. Start with a road grid, then homes, jobs, power and water.</div>' : `<span class="flbl">Facilities provided</span><div class="row" style="flex-wrap:wrap;gap:6px">${facilities.map(f => `<span class="pill ok">${f}</span>`).join('')}</div>`}
       <span class="flbl">How to play</span><div class="lst" style="font-size:12.5px">
       <div class="kv"><span>1 · Build roads</span><span>Every building needs road access</span></div>
       <div class="kv"><span>2 · Homes + jobs</span><span>Homes attract citizens; shophouses & industry create jobs. Use <b>Zoning (Z)</b> so private developers build too</span></div>
       <div class="kv"><span>3 · Power, water & services</span><span>Keep up supply and school/hospital/police coverage</span></div>
       <div class="kv"><span>4 · Reach milestones</span><span>Earn grants and unlock new buildings (mall, airport, tower…)</span></div>
-      <div class="kv"><span>5 · Focus on your nation first</span><span>Diplomacy unlocks at 5,000 population, new nations at 25,000</span></div>
+      <div class="kv"><span>5 · Focus on your nation first</span><span>${S.world === 'empty' ? 'There are no other nations in this world. New nations of your own unlock at 25,000 population' : 'Diplomacy unlocks at 5,000 population, new nations at 25,000'}</span></div>
       ${career() ? `<div class="kv"><span>6 · Career Mode · ${dif().n}</span><span>The people demand progress. You lose if you go bankrupt, are impeached or lose an election. Win by becoming a <b>Superpower</b></span></div>` : `<div class="kv"><span>6 · Sandbox Mode</span><span>No game over — build however you like</span></div>`}</div>
       <div class="box" style="margin-top:12px;display:flex;gap:10px;align-items:center"><div class="tri">${ico('target')}</div><div style="font-size:12.5px"><b>Follow the Agenda</b> at the top left — step-by-step goals with cash rewards. Click a goal to start building right away.</div></div>`,
       buttons: [{ l: `${ico('play')} Start governing`, pri: 1 }]
@@ -186,7 +189,7 @@ function enterGame(fresh) {
   } else toast(`Welcome back, ${presName()}`, dateStr(S.day), 'info', 'crown');
 }
 function renderTitle() {
-  const save = readSave(); let col = NCOLORS[0], mode = 'career', diff = 'normal';
+  const save = readSave(); let col = NCOLORS[0], mode = 'career', diff = 'normal', world = 'standard';
   $('#title').innerHTML = `<div class="tp">
     <div class="kick">Nation Builder · 3D</div>
     <div class="logo">CITYHOOD</div>
@@ -195,24 +198,25 @@ function renderTitle() {
       <label class="flbl" style="margin-top:0">President name</label><input class="tinput" id="tPres" maxlength="24" placeholder="Your name">
       <label class="flbl">Nation name</label><input class="tinput" id="tNat" maxlength="32" value="Dawn Republic">
       <label class="flbl">Flag color</label><div class="swatch" id="tSw">${NCOLORS.map(c => `<button data-c="${c}" style="background:${c}" class="${c === col ? 'on' : ''}"></button>`).join('')}</div>
+      <label class="flbl">World</label><div class="seg" id="tWorld">${Object.keys(WORLDS).map(k => `<button data-v="${k}" class="${k === world ? 'on' : ''}"><b>${WORLDS[k].n}</b><small>${WORLDS[k].d}</small></button>`).join('')}</div>
       <label class="flbl">Mode</label><div class="seg" id="tMode">${Object.keys(MODES).map(k => `<button data-v="${k}" class="${k === mode ? 'on' : ''}"><b>${MODES[k].n}</b><small>${MODES[k].d}</small></button>`).join('')}</div>
       <label class="flbl">Difficulty</label><div class="seg s3" id="tDiff">${Object.keys(DIFF).map(k => `<button data-v="${k}" class="${k === diff ? 'on' : ''}"><b>${DIFF[k].n}</b><small>${DIFF[k].d}</small></button>`).join('')}</div>
       <label class="flbl">World seed</label><div class="seed"><input class="tinput num" id="tSeed" value="${S.seed}" inputmode="numeric"><button class="btn" id="tRoll" style="height:46px">${ico('rotate')} Random</button></div>
       <div class="trow"><button class="btn pri f1" id="tStart" style="height:48px">${ico('crown')} Start Governing</button>${save ? `<button class="btn" id="tCont" style="height:48px">${ico('play')} Continue</button>` : ''}</div>
       ${save ? `<div class="ms" style="margin-top:10px">Save: ${esc(save.nations?.[save.active]?.name || '')} · ${dateStr(save.day || 0)}${save.over ? ' · term ended' : ''}</div>` : ''}
-      <button class="btn sm" id="tImp" style="margin-top:10px">${ico('upload')} Import save (.json)</button>
+      <div class="row" style="gap:6px;margin-top:10px;flex-wrap:wrap"><button class="btn sm" id="tImp">${ico('upload')} Import save (.json)</button><button class="btn sm" id="tWal">${ico('wallet')} Connect wallet</button></div>
     </div>
     <div class="feat"><div>${ico('map')} 160×160 continent</div><div>${ico('home')} 38 building types</div><div>${ico('flag')} Multi-nation</div><div>${ico('sun')} Day & night</div></div>
   </div>`;
   $('#title').classList.remove('hidden');
   $('#tSw').querySelectorAll('[data-c]').forEach(b => b.onclick = () => { col = b.dataset.c; $('#tSw').querySelectorAll('[data-c]').forEach(x => x.classList.toggle('on', x === b)); });
   const seg = (id, set) => $(id).querySelectorAll('[data-v]').forEach(b => b.onclick = () => { set(b.dataset.v); $(id).querySelectorAll('[data-v]').forEach(x => x.classList.toggle('on', x === b)); sfx('click'); });
-  seg('#tMode', v => mode = v); seg('#tDiff', v => diff = v);
-  $('#tImp').onclick = importSave;
+  seg('#tMode', v => mode = v); seg('#tDiff', v => diff = v); seg('#tWorld', v => world = v);
+  $('#tImp').onclick = importSave; $('#tWal').onclick = () => { sfx('click'); openWallet(); };
   const reseed = v => { const s = (parseInt(v) >>> 0) || 1; if (s !== S.seed) { S.cleared = new Set(); generateWorld(s); } $('#tSeed').value = S.seed; };
   $('#tRoll').onclick = () => reseed(Math.floor(Math.random() * 1e6));
   $('#tSeed').onchange = e => reseed(e.target.value);
-  $('#tStart').onclick = () => { sfx('click'); reseed($('#tSeed').value); newGame({ president: ($('#tPres').value || '').trim(), name: ($('#tNat').value || '').trim() || 'Dawn Republic', color: col, seed: S.seed, mode, diff }); };
+  $('#tStart').onclick = () => { sfx('click'); reseed($('#tSeed').value); newGame({ president: ($('#tPres').value || '').trim(), name: ($('#tNat').value || '').trim() || 'Dawn Republic', color: col, seed: S.seed, mode, diff, world }); };
   const c = $('#tCont'); if (c) c.onclick = () => { sfx('click'); loadGame(save); };
 }
 
@@ -248,7 +252,7 @@ function loop(now) {
   if (S.terrDirty) { rebuildTerritory(); if (W.tFill) W.tFill.visible = S.political || S.tool.mode === 'land' || S.tool.mode === 'found'; }
   updateLabels(dt);
   if (S.started) {
-    uiT += dt; if (uiT > 0.25) { uiT = 0; renderStats(); renderTime(); renderTracker(); renderRCI(); renderChips(); pumpModal(); if (S.selected && S.selected.b) renderInfoLive(); }
+    uiT += Math.min(1, raw); if (uiT > 0.25) { uiT = 0; renderStats(); renderTime(); renderTracker(); renderRCI(); renderChips(); pumpModal(); if (S.selected && S.selected.b) renderInfoLive(); }
     if (S.zoneDirty) rebuildZones();
     if (S.dmgDirty) { S.dmgDirty = false; paintOverlay(); }
     pbT += dt; if (pbT > 0.6) { pbT = 0; updateProblems(); }
@@ -267,7 +271,7 @@ addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); ca
 /* ---------------- init ---------------- */
 async function init() {
   const prog = (p, t) => { $('#lprog').style.width = p + '%'; $('#ltxt').textContent = t; return new Promise(r => setTimeout(r, 30)); };
-  initGfx();
+  initGfx(); walletLoad(); walletDiscover();
   await prog(10, 'Shaping the continent…');
   const save = readSave(); S.seed = save ? save.seed : Math.floor(Math.random() * 1e6);
   if (save) S.cleared = new Set(save.cleared || []);
@@ -281,6 +285,7 @@ async function init() {
   setTimeout(() => { $('#loading').style.opacity = 0; setTimeout(() => $('#loading').remove(), 650); renderTitle(); }, 250);
   if (new URLSearchParams(location.search).has('debug')) window.__game = { THREE, camera, checkSite, touchesRoad, setOverlay, checkUnlocks, S, act, placeBuilding, placeRoad, simDay, BT, cam, setTool, pickCat, openStats, openDiplo, openPolicy, openNations, owner: () => owner, terr: () => terr, ix, newGame, flyTo,
     realDay, voiceTick, calendarDay, econMonth, gdpGrowth, WX, wxDay, syncPlanes, syncShips, planes, ships, living: () => ({ bus: busM, ped: pedM }), districtAt, fireworks, trafficFactor, retargetLiving, priceNow, budOf, feedHTML,
+    WAL, walletConnect, walletSwitchChain, walletRefresh, walletRemove, openWallet,
     aiAct, animBuildings, autoUpgrade, zoneDev, paintZoneTiles, zone: () => zone, runDisaster, DISASTERS, damageB, repairB, EVENTS, runEvent, gameOver, checkEndings, victoryState, scoreOf, styleOf, ranking, natMods, demand, saveGame, readSave, loadGame, applyGfx, setMusic, MUS, aiDiplomacy, tariffEvent, demandEvent, queueModal, pumpModal, DIFF, monthEnd, nationFails, foundNation: (t, nm) => foundNation(t, nm, '#ec4899', 1), playerNations };
 }
 init().catch(e => { console.error(e); $('#ltxt').textContent = 'Failed to load: ' + e.message; });

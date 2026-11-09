@@ -128,6 +128,10 @@ The terrain is regenerated from `seed`, so only deltas are stored. A typical sav
 - **Calendar**: New Year fireworks, Independence Day (Aug 17: approval ±2 depending on happiness), Eid holiday (moves 11 days earlier each year; traffic ×1.7 for a week, business +12% that month).
 - **Economy**: player nations have a price level `n.P` that grows with inflation `n.infl`. Inflation rises with deficits and loans and falls with unemployment. Construction, upgrades, repairs, land, roads, upkeep, policies and income all scale with `P`, so hoarded cash loses value. Real GDP growth comes from income history; quarterly reports appear in the news. **Ministry budgets** (education, health, public safety, infrastructure; 50–150%) scale service coverage strength (0.55 + 0.45·budget) and the matching upkeep. Milestone grants are halved compared with v0.3.
 
+### 3.10 Worlds & wallets (v0.4.1)
+- **Worlds** (`WORLDS`, `S.world`, saved): `standard` (starter city + 3 AI nations) or `empty` / *Blank Slate*: no AI nations, no starter city, no roads, and trees cleared from the starting territory. Starting money is the same. With no housing at all, residential demand is fixed high (`demand()`) so zoning can start. Diplomacy explains that there are no other nations.
+- **Wallets** (`src/05e_wallet.js`): EIP-6963 discovery (fallback `window.ethereum`), several linked wallets stored per device in `localStorage['cityhood_wallets']` (`{list:[{address,rdns,name}], active}`), active wallet, `wallet_switchEthereumChain` with a `wallet_addEthereumChain` fallback (4902) for the chains in `EVM_CHAINS`, native balance via `eth_getBalance`, silent restore with `eth_accounts`. Removing the last address of a wallet tries `wallet_revokePermissions`. On a phone without an injected wallet the dialog offers a MetaMask deep link. It is read-only: nothing is signed or sent. Linking wallets to saves, leaderboards or on-chain rewards would need a backend and signature verification (Phase 3).
+
 ## 4. Balance knobs (where to tune)
 
 | What | Where | Current |

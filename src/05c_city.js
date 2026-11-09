@@ -270,7 +270,7 @@ function renderChips() {
   let el = $('#gchips'); if (!el) { el = document.createElement('div'); el.id = 'gchips'; $('#hud').appendChild(el); }
   const n = act(); if (!n) return; const D = dif(), ch = [];
   ch.push(`<button class="gc" data-g="goal">${ico(career() ? 'trophy' : 'sparkle')}${career() ? 'Career' : 'Sandbox'} · ${D.n}</button>`);
-  ch.push(wxChip());
+  ch.push(wxChip(), walletChip());
   if (career() && (n.dem || 0) >= 5) ch.push(`<button class="gc ${n.dem >= 25 ? 'bad' : 'wa'}" data-g="dem">${ico('users')}Public demand ${Math.round(n.dem)}</button>`);
   if (career() && n.debtM) ch.push(`<button class="gc bad" data-g="pol">${ico('coins')}Deficit ${n.debtM}/${D.crisis} mo</button>`);
   if (career() && n.lowM) ch.push(`<button class="gc bad" data-g="goal">${ico('alert')}No-confidence ${n.lowM}/6</button>`);
@@ -283,6 +283,7 @@ function renderChips() {
   el.querySelectorAll('[data-g]').forEach(b => b.onclick = () => {
     sfx('click'); const g = b.dataset.g;
     if (g === 'wx') weatherModal();
+    else if (g === 'wallet') openWallet();
     else if (g === 'goal') openStats('goal'); else if (g === 'dem') demandModal(); else if (g === 'pol') openPolicy(); else if (g === 'diplo') openDiplo();
     else if (g === 'dmg') { const d = [...S.dmgSet].find(x => x.nid === n.id); if (d) { flyTo(d.x, d.z, 28); select({ b: d }); } }
   });

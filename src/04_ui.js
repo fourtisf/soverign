@@ -88,9 +88,9 @@ function renderTime() {
   tb.querySelectorAll('[data-s]').forEach(b => { const v = +b.dataset.s; b.classList.toggle('on', v === 0 ? S.paused : (!S.paused && S.speed === v)); });
 }
 function renderMenu() {
-  const M = [['nations', 'crown', 'My Nations'], ['diplo', 'globe', 'Diplomacy'], ['policy', 'scale', 'Policy & Budget'], ['stats', 'chart', 'Statistics & News'], ['save', 'save', 'Save'], ['settings', 'gear', 'Menu & Settings']];
+  const M = [['nations', 'crown', 'My Nations'], ['diplo', 'globe', 'Diplomacy'], ['policy', 'scale', 'Policy & Budget'], ['stats', 'chart', 'Statistics & News'], ['wallet', 'wallet', 'Wallets (EVM)'], ['save', 'save', 'Save'], ['settings', 'gear', 'Menu & Settings']];
   $('#menu').innerHTML = M.map(m => { const lk = m[0] === 'diplo' && !S.unl.diplo; return `<button class="mbtn" data-m="${m[0]}" data-tip="${m[2]}${lk ? ' · unlocks at ' + fmtPop(UNL.diplo) + ' population' : ''}">${ico(m[1])}${lk ? `<span class="lkd">${ico('lock', 2.6)}</span>` : ''}</button>`; }).join('');
-  $('#menu').querySelectorAll('[data-m]').forEach(b => b.onclick = () => { sfx('click'); ({ nations: openNations, diplo: openDiplo, policy: openPolicy, stats: openStats, save: () => saveGame(false), settings: openSettings })[b.dataset.m](); });
+  $('#menu').querySelectorAll('[data-m]').forEach(b => b.onclick = () => { sfx('click'); ({ nations: openNations, diplo: openDiplo, policy: openPolicy, stats: openStats, wallet: openWallet, save: () => saveGame(false), settings: openSettings })[b.dataset.m](); });
   $('#nationCard').onclick = () => { sfx('click'); openNations(); };
 }
 function renderTools() {
@@ -440,7 +440,8 @@ canvas.addEventListener('wheel', e => {
 }, { passive: false });
 const keys = new Set();
 addEventListener('keydown', e => {
-  if (e.target.tagName === 'INPUT') return; const k = e.key.toLowerCase(); keys.add(k); if (!S.started) return;
+  if (e.target.tagName === 'INPUT') return; const k = e.key.toLowerCase(); keys.add(k);
+  if (!S.started) { if (k === 'escape' && !$('#modal').classList.contains('hidden') && !S.modalNoClose) closeModal(); return; }
   if (k === 'escape') { if (!$('#modal').classList.contains('hidden')) { if (!S.modalNoClose) closeModal(); } else if (S.tool.mode !== 'select') { setTool('select'); closeDrawer(); } else if (S.drawer) closeDrawer(); else if (S.overlay) setOverlay(S.overlay); else closeInfo(); }
   else if (!$('#modal').classList.contains('hidden')) return;
   else if (k === ' ') { e.preventDefault(); S.paused = !S.paused; renderTime(); }
@@ -597,7 +598,7 @@ function openDiplo() {
   }).join('');
   modal({
     title: 'International Diplomacy', sub: `Foreign relations of ${esc(me.name)} · GDP #${rankOf(me, 'gdp')} worldwide. Trade needs Relations ≥35, buying territory ≥50, Alliance ≥75 + trade partner. Relations <30 trigger tariffs, <22 sanctions.`, icon: 'globe', wide: 1,
-    html: `<div class="box" style="margin-bottom:10px;font-size:12px"><b>Defense:</b> ${hasDeterrence(me) ? '<span class="up">active</span> — aggressive nations think twice before claiming your territory.' : '<span class="dn">weak</span> — build a Military Base or enable Conscription to stop aggressive nations pressuring you.'}</div>` + rows,
+    html: (ais.length ? '' : '<div class="box" style="margin-bottom:10px;font-size:12.5px">There are no other nations in this world (Blank Slate). Found new nations of your own from the Territory tool.</div>') + `<div class="box" style="margin-bottom:10px;font-size:12px"><b>Defense:</b> ${hasDeterrence(me) ? '<span class="up">active</span> — aggressive nations think twice before claiming your territory.' : '<span class="dn">weak</span> — build a Military Base or enable Conscription to stop aggressive nations pressuring you.'}</div>` + rows,
     onRender: box => box.querySelectorAll('[data-a]').forEach(b => b.onclick = () => {
       const a = S.nations[+b.dataset.id], k = b.dataset.a;
       if (k === 'trade') { if (me.treasury < 1.5e6) return toast('Not enough funds', '', 'bad', 'alert'); me.treasury -= 1.5e6; me.trades.push(a.id); a.trades.push(me.id); bump('trade'); a.rel = Math.min(100, a.rel + 5); toast('Trade agreement signed', `${me.name} × ${a.name}`, 'gold', 'hand'); addNews(`${me.name} and ${a.name} signed a trade agreement.`); sfx('coin'); }

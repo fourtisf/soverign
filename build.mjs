@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const src = f => readFileSync(join(root, 'src', f), 'utf8');
-const JS_ORDER = ['01_core.js', '02_geometry.js', '03_simulation.js', '04_ui.js', '05_progression.js', '05b_governance.js', '05c_city.js', '05d_realism.js', '06_main.js'];
+const JS_ORDER = ['01_core.js', '02_geometry.js', '03_simulation.js', '04_ui.js', '05_progression.js', '05b_governance.js', '05c_city.js', '05d_realism.js', '05e_wallet.js', '06_main.js'];
 
 const html = [
   src('00_shell.html'),

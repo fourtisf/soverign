@@ -22,6 +22,7 @@ const DIFF = {
   normal: { n: 'Normal', d: 'A balanced challenge', cash: 1, upk: 1, dem: 0.8, demMax: 45, appLo: 25, crisis: 6, coal: 1, dis: 1, ai: 1, vic: 250e3, sc: 1 },
   hard: { n: 'Hard', d: 'Small budget, demanding citizens, aggressive neighbors', cash: 0.7, upk: 1.15, dem: 1.1, demMax: 55, appLo: 30, crisis: 4, coal: 0, dis: 1.5, ai: 1.5, vic: 400e3, sc: 1.5 },
 };
+const WORLDS = { standard: { n: 'Standard', d: 'Starter city & neighbouring nations' }, empty: { n: 'Blank Slate', d: 'Empty, tidy land — just money' } };
 const MODES = { career: { n: 'Career', d: 'Victory & defeat are possible' }, sandbox: { n: 'Sandbox', d: 'Relaxed, no game over' } };
 const TERM_MONTHS = 240;                       // 20-year tenure (4 terms)
 const dif = () => DIFF[S.diff] || DIFF.normal;
